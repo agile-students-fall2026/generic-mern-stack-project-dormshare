@@ -43,49 +43,84 @@ Contributions may include new features, bug fixes, UI improvements, tests, docum
 
 ## 4. Local Development Environment
 
-DormShare uses the MERN stack: MongoDB, Express.js, React, and Node.js.
+DormShare uses React, Express.js, and Node.js. The Sprint 0 backend health check runs without a database. Database setup is tracked separately.
 
 ### Prerequisites
 
 - Git
-- Node.js and npm
-- A code editor (VS Code recommended)
+- Node.js 20.19.0 or newer, with npm
 - Access to the DormShare GitHub repository
 
-### Setup
+### Match your Git and GitHub usernames
+
+Course contribution records use the Git username attached to commits. In the repository directory, set it to your GitHub username and confirm the value:
+
+```bash
+git config user.name "your-github-username"
+git config user.name
+```
+
+### Get the project
 
 Clone the repository:
 
 ```bash
-git clone https://github.com/agile-students-fall2026/generic-mern-stack-project-dormshare.git
-cd generic-mern-stack-project-dormshare
+git clone https://github.com/agile-students-fall2026/dormshare.git
+cd dormshare
 ```
 
-Install frontend dependencies:
+### Run the front end
 
 ```bash
 cd front-end
 npm install
+npm run dev
 ```
 
-Install backend dependencies:
+Open the local address printed by Vite, usually `http://localhost:5173`. Leave this terminal running.
+
+### Run the back end
+
+Open a second terminal from the repository root, then run:
 
 ```bash
-cd ../back-end
+cd back-end
 npm install
+npm run dev
 ```
 
-Database configuration and required environment variables will be documented once the development environment is finalized.
+The server listens at `http://127.0.0.1:3001`. Visit `http://127.0.0.1:3001/api/health`. It should return `{"status":"ok"}`. Leave this terminal running while you work.
+
+Stop either development server with `Ctrl+C` in its terminal.
+
+### Test the back end
+
+From the `back-end/` directory, run:
+
+```bash
+npm test
+npm run test:coverage
+```
+
+To run the backend without automatic restarts, use `npm start` from `back-end/`.
+
+### Troubleshooting
+
+- **Unsupported Node.js version:** Run `node --version` and install Node.js 20.19.0 or newer.
+- **Port 3001 is already in use:** Stop the other backend process. To use another port, run `PORT=3002 npm run dev` on macOS or Linux. In PowerShell, run `$env:PORT=3002` and then `npm run dev`.
+- **The front end opens on a different port:** Vite selects another available port when 5173 is busy. Use the address printed in the front-end terminal.
+- **The backend health check does not respond:** Confirm the backend terminal is still running, then check the port shown in its output.
+- **Dependencies are missing:** Run `npm install` from the relevant `front-end/` or `back-end/` directory.
+
+Database connection settings and credentials are not part of this Sprint 0 setup. Do not commit `.env` files or credentials.
 
 ## 5. Building and Testing
 
-The final build and test commands have not yet been established.
+For the front end, run these commands from `front-end/`:
 
-Until then, contributors should:
+```bash
+npm run build
+npm run lint
+```
 
-- Verify that their changes work locally.
-- Check that existing functionality is unaffected.
-- Test relevant frontend interactions and backend endpoints.
-- Address errors before requesting a PR review.
-
-This section will be updated with the exact commands for running, building, and testing the application as development progresses.
+For backend tests and coverage, see [Test the back end](#test-the-back-end). The backend currently provides a health check only. Add and document tests as features are implemented.
