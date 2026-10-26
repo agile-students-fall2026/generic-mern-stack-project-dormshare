@@ -124,3 +124,22 @@ npm run lint
 ```
 
 For backend tests and coverage, see [Test the back end](#test-the-back-end). The backend currently provides a health check only. Add and document tests as features are implemented.
+
+
+### Database setup
+
+We use MongoDB Atlas with Mongoose. You do not need to install MongoDB locally.
+
+From the `back-end` directory, install dependencies:
+
+```bash
+npm install
+```
+
+Create a `.env` file in `back-end` using `.env.example` as a template. Once the team's Atlas cluster is available, set `MONGODB_URI` to its connection string.
+
+Check the connection:
+
+```bash
+npm run db:check
+```
