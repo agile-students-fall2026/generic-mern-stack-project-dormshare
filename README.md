@@ -12,6 +12,10 @@ Unlike general-purpose online marketplaces, DormShare is designed around tempora
 
 Our goal is to make borrowing within the NYU community safer, simpler, and more convenient while reducing unnecessary purchases and allowing students to earn from belongings they are not currently using.
 
+## Project History
+
+DormShare began as the team's proposal for helping NYU students access everyday items temporarily instead of buying something they only need for a short time. The team is shaping that idea into a verified campus marketplace. Sprint 0 is focused on defining the user flows, preparing the prototype, and setting up shared development practices.
+
 ## The Problem
 
 Students frequently need items for a short period of time: tools, electronics, household equipment, event supplies, sports equipment, and other everyday products. Buying these items can be expensive and wasteful when they may only be needed once or for a few days.
@@ -109,18 +113,30 @@ Additional development and deployment tooling will be documented as the project 
 
 ## Development Setup
 
-The project is currently in Sprint 0 and does not yet contain the production React and Express applications.
-
-Complete local setup, build, run, and testing instructions will be added as development begins in Sprint 1 and expanded throughout subsequent sprints.
-
-For now, contributors should clone the repository:
+The repository includes a basic React front end and an Express backend health check for local setup. Product features are planned for later sprints. To run both development servers:
 
 ```bash
 git clone https://github.com/agile-students-fall2026/dormshare.git
 cd dormshare
 ```
 
-Contributors should read [CONTRIBUTING.md](./CONTRIBUTING.md) before beginning work.
+In one terminal:
+
+```bash
+cd front-end
+npm install
+npm run dev
+```
+
+In a second terminal from the repository root:
+
+```bash
+cd back-end
+npm install
+npm run dev
+```
+
+The front end prints its local address. The backend health check is at <http://127.0.0.1:3001/api/health> and returns `{"status":"ok"}`. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for prerequisites, test commands, and troubleshooting before beginning work.
 
 ## Repository Structure
 
