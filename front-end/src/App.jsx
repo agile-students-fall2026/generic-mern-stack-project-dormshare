@@ -7,34 +7,142 @@ const startingListings = [
 ]
 
 function App() {
-  const [listings] = useState(startingListings)
+  const [listings, setListings] = useState(startingListings)
+  const [formOpen, setFormOpen] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [form, setForm] = useState({ title: '', price: '' })
+
+  function startNewListing() {
+    setEditingId(null)
+    setForm({ title: '', price: '' })
+    setFormOpen(true)
+  }
+
+  function startEditing(listing) {
+    setEditingId(listing.id)
+    setForm({ title: listing.title, price: String(listing.price) })
+    setFormOpen(true)
+  }
+
+  function saveListing(event) {
+    event.preventDefault()
+
+    const title = form.title.trim()
+    const price = Number(form.price)
+
+    if (!title || !Number.isFinite(price) || price < 0) return
+
+    if (editingId === null) {
+      setListings((current) => [
+        { id: Date.now(), title, price, status: 'Draft' },
+        ...current,
+      ])
+    } else {
+      setListings((current) =>
+        current.map((listing) =>
+          listing.id === editingId ? { ...listing, title, price } : listing,
+        ),
+      )
+    }
+
+    setFormOpen(false)
+    setEditingId(null)
+    setForm({ title: '', price: '' })
+  }
+
+  function toggleStatus(id) {
+    setListings((current) =>
+      current.map((listing) => {
+        if (listing.id !== id) return listing
+
+        return {
+          ...listing,
+          status: listing.status === 'Published' ? 'Paused' : 'Published',
+        }
+      }),
+    )
+  }
+
   return (
-    <main>
+    <main className="page">
       <header className="page-header">
         <div>
           <h1>DormShare</h1>
           <p>Manage the items you lend to other students.</p>
         </div>
+        <button className="primary-button" onClick={startNewListing}>
+          Add listing
+        </button>
       </header>
-            <section>
-        <h2>My listings</h2>
-        <div className="listing-grid">
-          {listings.map((listing) => (
-            <article className="listing-card" key={listing.id}>
-              <div>
-                <h3>{listing.title}</h3>
-                <p>${listing.price.toFixed(2)} per day</p>
-              </div>
-              <span
-                className={`status status-${listing.status.toLowerCase()}`}
-              >
-                {listing.status}
-              </span>
-            </article>
-          ))}
-        </div>
-      </section>
 
+      {formOpen && (
+        <form className="listing-form" onSubmit={saveListing}>
+          <h2>{editingId === null ? 'New listing' : 'Edit listing'}</h2>
+
+          <label>
+            Item name
+            <input
+              required
+              value={form.title}
+              onChange={(event) =>
+                setForm({ ...form, title: event.target.value })
+              }
+            />
+          </label>
+
+          <label>
+            Price per day
+            <input
+              required
+              min="0"
+              step="0.01"
+              type="number"
+              value={form.price}
+              onChange={(event) =>
+                setForm({ ...form, price: event.target.value })
+              }
+            />
+          </label>
+
+          <div className="form-actions">
+            <button className="primary-button" type="submit">
+              Save listing
+            </button>
+            <button type="button" onClick={() => setFormOpen(false)}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+
+      <section>
+        <h2>My listings</h2>
+        {listings.length === 0 ? (
+          <p>No listings yet. Add one to get started.</p>
+        ) : (
+          <div className="listing-grid">
+            {listings.map((listing) => (
+              <article className="listing-card" key={listing.id}>
+                <div>
+                  <h3>{listing.title}</h3>
+                  <p>${listing.price.toFixed(2)} per day</p>
+                  <span
+                    className={`status status-${listing.status.toLowerCase()}`}
+                  >
+                    {listing.status}
+                  </span>
+                </div>
+                <div className="listing-actions">
+                  <button onClick={() => startEditing(listing)}>Edit</button>
+                  <button onClick={() => toggleStatus(listing.id)}>
+                    {listing.status === 'Published' ? 'Pause' : 'Publish'}
+                  </button>
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </section>
     </main>
   )
 }
