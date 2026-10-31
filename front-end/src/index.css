@@ -11,7 +11,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -37,111 +38,9 @@ p {
 }
 
 .page-header p,
-.listing-card p {
+.listing-card p,
+.rental-card p {
   color: #626b76;
-}
-
-.listing-grid {
-  display: grid;
-  gap: 12px;
-}
-
-.listing-card {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 18px;
-  border: 1px solid #e0e3e8;
-  border-radius: 10px;
-  background: white;
-}
-
-.listing-card h3 {
-  margin-bottom: 6px;
-}
-
-.listing-card p {
-  margin-bottom: 0;
-}
-
-.listing-card .status {
-  display: inline-block;
-  margin-top: 10px;
-}
-
-.status {
-  padding: 5px 9px;
-  border-radius: 20px;
-  font-size: 14px;
-}
-
-.status-published {
-  background: #e3f4e9;
-  color: #206339;
-}
-
-.status-paused {
-  background: #fff1d8;
-  color: #805714;
-}
-
-.status-draft {
-  background: #e9edf2;
-  color: #47515c;
-}
-
-.primary-button {
-  border: 0;
-  border-radius: 7px;
-  padding: 10px 14px;
-  background: #315fce;
-  color: white;
-  cursor: pointer;
-}
-
-.listing-form {
-  display: grid;
-  gap: 14px;
-  margin-bottom: 28px;
-  padding: 20px;
-  border: 1px solid #e0e3e8;
-  border-radius: 10px;
-  background: white;
-}
-
-.listing-form label {
-  display: grid;
-  gap: 6px;
-}
-
-.listing-form input {
-  width: 100%;
-  padding: 9px;
-  border: 1px solid #cbd0d8;
-  border-radius: 6px;
-}
-
-.form-actions,
-.listing-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.form-actions button,
-.listing-actions button {
-  padding: 8px 11px;
-  border: 1px solid #cbd0d8;
-  border-radius: 6px;
-  background: white;
-  cursor: pointer;
-}
-
-.form-actions .primary-button {
-  border: 0;
-  background: #315fce;
-  color: white;
 }
 
 .summary {
@@ -169,6 +68,65 @@ p {
   font-size: 24px;
 }
 
+.listing-form,
+.preview-card {
+  display: grid;
+  gap: 14px;
+  margin-bottom: 28px;
+  padding: 20px;
+  border: 1px solid #e0e3e8;
+  border-radius: 10px;
+  background: white;
+}
+
+.listing-form label {
+  display: grid;
+  gap: 6px;
+}
+
+.listing-form input,
+.listing-form select,
+.listing-form textarea {
+  width: 100%;
+  padding: 9px;
+  border: 1px solid #cbd0d8;
+  border-radius: 6px;
+}
+
+.form-actions,
+.listing-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.primary-button,
+.form-actions button,
+.listing-actions button {
+  padding: 8px 11px;
+  border: 1px solid #cbd0d8;
+  border-radius: 6px;
+  background: white;
+  cursor: pointer;
+}
+
+.primary-button {
+  border: 0;
+  padding: 10px 14px;
+  border-radius: 7px;
+  background: #315fce;
+  color: white;
+}
+
+.form-actions .primary-button {
+  border: 0;
+}
+
+.listings-section,
+.rentals-section {
+  margin-bottom: 32px;
+}
+
 .filters {
   display: flex;
   gap: 10px;
@@ -188,13 +146,84 @@ p {
   min-width: 0;
 }
 
+.listing-grid,
+.rental-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.listing-card,
+.rental-card {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px;
+  border: 1px solid #e0e3e8;
+  border-radius: 10px;
+  background: white;
+}
+
+.listing-card > div:first-child,
+.rental-card > div:first-child {
+  flex: 1;
+}
+
+.listing-card h3,
+.rental-card h3 {
+  margin-bottom: 6px;
+}
+
+.listing-card p,
+.rental-card p {
+  margin-bottom: 6px;
+}
+
+.status,
+.rental-status {
+  display: inline-block;
+  padding: 5px 9px;
+  border-radius: 20px;
+  font-size: 14px;
+}
+
+.status {
+  margin-top: 6px;
+}
+
+.status-published {
+  background: #e3f4e9;
+  color: #206339;
+}
+
+.status-paused {
+  background: #fff1d8;
+  color: #805714;
+}
+
+.status-draft {
+  background: #e9edf2;
+  color: #47515c;
+}
+
+.rental-status {
+  background: #e9edf2;
+  color: #47515c;
+  text-transform: capitalize;
+}
+
 @media (max-width: 600px) {
+  .page-header {
+    display: grid;
+    gap: 12px;
+  }
+
   .summary {
     grid-template-columns: 1fr;
   }
 
-  .page-header {
+  .listing-card,
+  .rental-card {
     display: grid;
-    gap: 12px;
   }
 }
