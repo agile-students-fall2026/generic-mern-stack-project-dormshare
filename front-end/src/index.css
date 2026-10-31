@@ -22,6 +22,10 @@ select {
 }
 
 .page-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
   margin-bottom: 32px;
 }
 
@@ -42,10 +46,9 @@ p {
   gap: 12px;
 }
 
-
 .listing-card {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   padding: 18px;
@@ -60,6 +63,11 @@ p {
 
 .listing-card p {
   margin-bottom: 0;
+}
+
+.listing-card .status {
+  display: inline-block;
+  margin-top: 10px;
 }
 
 .status {
@@ -136,15 +144,57 @@ p {
   color: white;
 }
 
-.listing-card {
-  align-items: flex-start;
+.summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
 }
 
-.listing-card h3 {
-  margin-bottom: 6px;
+.summary article {
+  display: grid;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid #e0e3e8;
+  border-radius: 10px;
+  background: white;
 }
 
-.listing-card .status {
-  display: inline-block;
-  margin-top: 10px;
+.summary span {
+  color: #626b76;
+  font-size: 14px;
+}
+
+.summary strong {
+  font-size: 24px;
+}
+
+.filters {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.filters input,
+.filters select {
+  padding: 9px;
+  border: 1px solid #cbd0d8;
+  border-radius: 6px;
+  background: white;
+}
+
+.filters input {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  .summary {
+    grid-template-columns: 1fr;
+  }
+
+  .page-header {
+    display: grid;
+    gap: 12px;
+  }
 }

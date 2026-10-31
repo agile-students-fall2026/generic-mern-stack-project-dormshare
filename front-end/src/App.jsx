@@ -11,6 +11,25 @@ function App() {
   const [formOpen, setFormOpen] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState({ title: '', price: '' })
+  const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState('All')
+
+  const visibleListings = listings.filter((listing) => {
+    const matchesStatus =
+      statusFilter === 'All' || listing.status === statusFilter
+    const matchesSearch = listing.title
+      .toLowerCase()
+      .includes(search.trim().toLowerCase())
+
+    return matchesStatus && matchesSearch
+  })
+
+  const publishedCount = listings.filter(
+    (listing) => listing.status === 'Published',
+  ).length
+  const pausedCount = listings.filter(
+    (listing) => listing.status === 'Paused',
+  ).length
 
   function startNewListing() {
     setEditingId(null)
@@ -74,7 +93,20 @@ function App() {
           Add listing
         </button>
       </header>
-
+      <section className="summary">
+        <article>
+          <span>Total listings</span>
+          <strong>{listings.length}</strong>
+        </article>
+        <article>
+          <span>Published</span>
+          <strong>{publishedCount}</strong>
+        </article>
+        <article>
+          <span>Paused</span>
+          <strong>{pausedCount}</strong>
+        </article>
+      </section>
       {formOpen && (
         <form className="listing-form" onSubmit={saveListing}>
           <h2>{editingId === null ? 'New listing' : 'Edit listing'}</h2>
@@ -117,11 +149,33 @@ function App() {
 
       <section>
         <h2>My listings</h2>
-        {listings.length === 0 ? (
-          <p>No listings yet. Add one to get started.</p>
+        <div className="filters">
+          <input
+            aria-label="Search listings"
+            placeholder="Search listings"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <select
+            aria-label="Filter by status"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+          >
+            <option>All</option>
+            <option>Published</option>
+            <option>Paused</option>
+            <option>Draft</option>
+          </select>
+        </div>
+        {visibleListings.length === 0 ? (
+          <p>
+            {listings.length === 0
+              ? 'No listings yet. Add one to get started.'
+              : 'No listings match your search.'}
+          </p>
         ) : (
           <div className="listing-grid">
-            {listings.map((listing) => (
+            {visibleListings.map((listing) => (
               <article className="listing-card" key={listing.id}>
                 <div>
                   <h3>{listing.title}</h3>
