@@ -3,6 +3,17 @@ import { listingCategories } from "../../shared/options.mjs";
 
 export const ownerListingsRouter = Router();
 
+ownerListingsRouter.param("id", async (request, response, next, id) => {
+  const data = await request.app.locals.mockDataStore.load();
+  const listing = data.listings.find((item) => String(item.id) === id);
+  if (!listing) return response.status(404).json({ error: "Listing not found." });
+  if (listing.ownerId !== request.currentUserId) {
+    return response.status(403).json({ error: "You can only manage your own listings." });
+  }
+  request.ownerListing = listing;
+  next();
+});
+
 function listingDetails(body) {
   if (!body || typeof body !== "object" || Array.isArray(body)) return null;
   const { title, category, description, price, rentalTerms } = body;
@@ -33,4 +44,12 @@ ownerListingsRouter.post("/", async (request, response) => {
   };
   data.listings.unshift(listing);
   response.status(201).json(listing);
+});
+
+ownerListingsRouter.put("/:id", (request, response) => {
+  const details = listingDetails(request.body);
+  if (!details) return response.status(400).json({ error: "Invalid listing details." });
+
+  Object.assign(request.ownerListing, details);
+  response.json(request.ownerListing);
 });

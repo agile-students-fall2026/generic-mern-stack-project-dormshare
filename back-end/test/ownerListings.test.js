@@ -110,4 +110,52 @@ describe("Owner listing routes (#106)", () => {
       });
     }
   });
+
+  describe("PUT /api/listings/:id", () => {
+    it("updates all editable details and preserves server-owned fields", async () => {
+      data.listings[0].image = "https://picsum.photos/seed/original/320/240";
+      data.listings[0].createdAt = "2026-11-01";
+      const before = structuredClone(data.listings[0]);
+      const response = await api("PUT", "/1", {
+        ...details(), price: 0, id: 99, ownerId: "student-2", status: "paused", image: "changed", createdAt: "changed",
+      });
+      expect(response.status).to.equal(200);
+      expect(response.body).to.deep.equal({
+        ...before, title: "Desk fan", category: "Appliances", description: "Small fan.", price: 0, rentalTerms: "Return clean.",
+      });
+      expect(data.listings[0]).to.deep.equal(response.body);
+      expect((await api("GET", "/mine")).body[0]).to.deep.equal(response.body);
+    });
+
+    for (const [name, changes] of invalidDetails) {
+      it(`rejects ${name} without changing a listing`, async () => {
+        const before = structuredClone(data.listings);
+        const response = await api("PUT", "/1", { ...details(), ...changes });
+        expect(response.status).to.equal(400);
+        expect(data.listings).to.deep.equal(before);
+      });
+    }
+
+    for (const body of [undefined, null, [], "text"]) {
+      it(`rejects a nonobject or missing edit body: ${JSON.stringify(body)}`, async () => {
+        const before = structuredClone(data.listings);
+        expect((await api("PUT", "/1", body)).status).to.equal(400);
+        expect(data.listings).to.deep.equal(before);
+      });
+    }
+
+    it("returns 404 for an unknown listing without changing records", async () => {
+      const before = structuredClone(data.listings);
+      expect(await api("PUT", "/999", details())).to.deep.equal({ status: 404, body: { error: "Listing not found." } });
+      expect(data.listings).to.deep.equal(before);
+    });
+
+    it("rejects edits to another owner's listing despite a forged identity header", async () => {
+      const before = structuredClone(data.listings);
+      expect(await api("PUT", "/2", details())).to.deep.equal({
+        status: 403, body: { error: "You can only manage your own listings." },
+      });
+      expect(data.listings).to.deep.equal(before);
+    });
+  });
 });
