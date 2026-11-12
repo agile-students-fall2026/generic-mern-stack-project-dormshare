@@ -1,5 +1,5 @@
 import { Router } from "express";
-import { listingCategories } from "../../shared/options.mjs";
+import { listingCategories, listingStatuses } from "../../shared/options.mjs";
 
 export const ownerListingsRouter = Router();
 
@@ -51,5 +51,15 @@ ownerListingsRouter.put("/:id", (request, response) => {
   if (!details) return response.status(400).json({ error: "Invalid listing details." });
 
   Object.assign(request.ownerListing, details);
+  response.json(request.ownerListing);
+});
+
+ownerListingsRouter.patch("/:id/status", (request, response) => {
+  const body = request.body;
+  if (!body || typeof body !== "object" || Array.isArray(body) || !listingStatuses.includes(body.status)) {
+    return response.status(400).json({ error: "Invalid listing status." });
+  }
+
+  request.ownerListing.status = body.status;
   response.json(request.ownerListing);
 });

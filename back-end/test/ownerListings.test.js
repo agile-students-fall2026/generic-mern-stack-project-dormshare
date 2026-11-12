@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, it } from "mocha";
 import { expect } from "chai";
+import express from "express";
 import { createApp } from "../app.js";
+import { currentUser } from "../middleware/currentUser.js";
+import { ownerListingsRouter } from "../routes/ownerListings.js";
 import { createMockDataStore } from "../services/mockData.js";
 import { mockData } from "./fixtures.js";
 import { startTestServer } from "./helpers/server.js";
@@ -157,5 +160,76 @@ describe("Owner listing routes (#106)", () => {
       });
       expect(data.listings).to.deep.equal(before);
     });
+  });
+
+  describe("PATCH /api/listings/:id/status", () => {
+    for (const status of ["published", "paused", "draft"]) {
+      it(`allows the owner to set ${status}`, async () => {
+        const response = await api("PATCH", "/4/status", { status });
+        expect(response.status).to.equal(200);
+        expect(response.body.status).to.equal(status);
+        expect(data.listings.find((listing) => listing.id === 4).status).to.equal(status);
+      });
+    }
+
+    it("changes only status when other fields are submitted", async () => {
+      const before = structuredClone(data.listings[3]);
+      const response = await api("PATCH", "/4/status", {
+        status: "published", id: 99, ownerId: "student-2", title: "Changed", image: "changed", price: 99,
+      });
+      expect(response).to.deep.equal({ status: 200, body: { ...before, status: "published" } });
+      expect(data.listings[3]).to.deep.equal(response.body);
+    });
+
+    for (const body of [undefined, null, [], "text", {}, { status: "deleted" }, { status: 1 }, { status: null }, { status: true }]) {
+      it(`rejects an invalid status request: ${JSON.stringify(body)}`, async () => {
+        const before = structuredClone(data.listings);
+        expect((await api("PATCH", "/1/status", body)).status).to.equal(400);
+        expect(data.listings).to.deep.equal(before);
+      });
+    }
+
+    it("returns 404 for an unknown listing", async () => {
+      const before = structuredClone(data.listings);
+      expect(await api("PATCH", "/999/status", { status: "paused" })).to.deep.equal({
+        status: 404, body: { error: "Listing not found." },
+      });
+      expect(data.listings).to.deep.equal(before);
+    });
+
+    it("rejects changes to another owner's listing", async () => {
+      const before = structuredClone(data.listings);
+      expect(await api("PATCH", "/2/status", { status: "paused" })).to.deep.equal({
+        status: 403, body: { error: "You can only manage your own listings." },
+      });
+      expect(data.listings).to.deep.equal(before);
+    });
+  });
+
+  it("passes store failures to the safe error handler on listing routes", async () => {
+    app.locals.mockDataStore.load = async () => { throw Object.assign(new Error("private-key"), { status: 502 }); };
+    for (const [method, path, body] of [
+      ["GET", "/mine"], ["POST", "", details()], ["PUT", "/1", details()], ["PATCH", "/1/status", { status: "paused" }],
+    ]) {
+      expect(await api(method, path, body)).to.deep.equal({ status: 502, body: { error: "Could not load mock data." } });
+    }
+  });
+
+  it("can share the prefix with a separate public item-read router", async () => {
+    const combined = express();
+    combined.locals.mockDataStore = app.locals.mockDataStore;
+    combined.use(currentUser);
+    combined.use("/api/listings", ownerListingsRouter);
+    combined.get("/api/listings/:id", (request, response) => response.json({ publicItem: request.params.id }));
+    const probe = await startTestServer(combined);
+    try {
+      const mine = await fetch(`${probe.baseUrl}/api/listings/mine`);
+      expect((await mine.json()).map((listing) => listing.id)).to.deep.equal([1, 3, 4]);
+      const otherItem = await fetch(`${probe.baseUrl}/api/listings/2`);
+      expect(otherItem.status).to.equal(200);
+      expect(await otherItem.json()).to.deep.equal({ publicItem: "2" });
+    } finally {
+      await probe.close();
+    }
   });
 });

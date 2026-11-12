@@ -55,6 +55,34 @@ headers. This is the placeholder for #92, not a login system.
 Validation and option values live in `../shared/`. The frontend imports the same
 rules through its existing service and option paths.
 
+## Owner listing routes
+
+`routes/ownerListings.js` handles #106 under `/api/listings`:
+
+| Method | Path | Response |
+| --- | --- | --- |
+| GET | `/api/listings/mine` | Current owner's listings in every status |
+| POST | `/api/listings` | Created draft listing, status 201 |
+| PUT | `/api/listings/:id` | Updated listing |
+| PATCH | `/api/listings/:id/status` | Listing with updated status |
+
+POST and PUT require `title`, `category`, `description`, `price`, and
+`rentalTerms`. Text fields must not be blank. Category must match the shared
+options. Price must be a finite number of zero or more. Strings such as `"5"`
+are not accepted as prices. PUT replaces all five editable fields.
+
+The server assigns IDs, owner IDs, placeholder images, and the initial draft
+status. POST and PUT ignore other submitted fields. PATCH changes only status
+and accepts `draft`, `published`, or `paused`.
+
+Edits and status changes return 404 for a missing listing and 403 for another
+owner's listing. Invalid details or status values return 400 without changing
+the records. Successful changes remain in the shared store until restart.
+
+Search and individual item reads belong to #116 in a separate router. Mount
+that router after `ownerListingsRouter` so `/mine` takes precedence over `/:id`.
+Frontend integration remains in #108.
+
 ## Tests
 
 ```sh
