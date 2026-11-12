@@ -1,0 +1,113 @@
+import { afterEach, beforeEach, describe, it } from "mocha";
+import { expect } from "chai";
+import { createApp } from "../app.js";
+import { createMockDataStore } from "../services/mockData.js";
+import { mockData } from "./fixtures.js";
+import { startTestServer } from "./helpers/server.js";
+
+const details = () => ({
+  title: "  Desk fan  ", category: "Appliances", description: "  Small fan.  ",
+  price: 2.5, rentalTerms: "  Return clean.  ",
+});
+
+const invalidDetails = [
+  ["missing title", { title: undefined }],
+  ["blank title", { title: "   " }],
+  ["non-string title", { title: 12 }],
+  ["missing category", { category: undefined }],
+  ["unknown category", { category: "Other" }],
+  ["missing description", { description: undefined }],
+  ["blank description", { description: " " }],
+  ["non-string description", { description: {} }],
+  ["missing price", { price: undefined }],
+  ["negative price", { price: -1 }],
+  ["string price", { price: "5" }],
+  ["null price", { price: null }],
+  ["missing rental terms", { rentalTerms: undefined }],
+  ["blank rental terms", { rentalTerms: " " }],
+  ["non-string rental terms", { rentalTerms: false }],
+];
+
+describe("Owner listing routes (#106)", () => {
+  let server;
+  let app;
+  let data;
+
+  beforeEach(async () => {
+    const payload = mockData();
+    payload.listings.push(
+      { ...payload.listings[0], id: 2, ownerId: "student-2" },
+      { ...payload.listings[0], id: 3, status: "paused" },
+      { ...payload.listings[0], id: 4, status: "draft" },
+    );
+    const store = createMockDataStore({ apiKey: "test-key", fetchImpl: async () => Response.json(payload) });
+    data = await store.load();
+    app = createApp({ store });
+    server = await startTestServer(app);
+  });
+
+  afterEach(async () => { await server?.close(); });
+
+  async function api(method, path = "", body) {
+    const response = await fetch(`${server.baseUrl}/api/listings${path}`, {
+      method, headers: { "content-type": "application/json", "x-user-id": "student-2" },
+      body: body === undefined ? undefined : JSON.stringify(body),
+    });
+    return { status: response.status, body: await response.json() };
+  }
+
+  describe("GET /api/listings/mine", () => {
+    it("returns only the current owner's listings in every status", async () => {
+      const response = await api("GET", "/mine");
+      expect(response.status).to.equal(200);
+      expect(response.body.map((listing) => listing.id)).to.deep.equal([1, 3, 4]);
+      expect(response.body.map((listing) => listing.status)).to.deep.equal(["published", "paused", "draft"]);
+    });
+
+    it("returns an empty array when the owner has no listings", async () => {
+      data.listings = data.listings.filter((listing) => listing.ownerId !== "owner-1");
+      expect(await api("GET", "/mine")).to.deep.equal({ status: 200, body: [] });
+    });
+  });
+
+  describe("POST /api/listings", () => {
+    it("creates a trimmed draft using server-owned identity and metadata", async () => {
+      const response = await api("POST", "", {
+        ...details(), id: 99, ownerId: "student-2", status: "published", image: "https://example.com/image.png",
+      });
+      expect(response.status).to.equal(201);
+      expect(response.body).to.deep.equal({
+        id: 5, ownerId: "owner-1", status: "draft", image: "https://picsum.photos/seed/dormshare-5/320/240",
+        title: "Desk fan", category: "Appliances", description: "Small fan.", price: 2.5, rentalTerms: "Return clean.",
+      });
+      expect(data.listings[0]).to.deep.equal(response.body);
+      expect((await api("GET", "/mine")).body[0]).to.deep.equal(response.body);
+    });
+
+    it("starts at ID 1 when there are no listings and accepts a free listing", async () => {
+      data.listings = [];
+      const response = await api("POST", "", { ...details(), price: 0 });
+      expect(response.status).to.equal(201);
+      expect(response.body.id).to.equal(1);
+      expect(response.body.price).to.equal(0);
+    });
+
+    for (const [name, changes] of invalidDetails) {
+      it(`rejects ${name} without creating a listing`, async () => {
+        const before = structuredClone(data.listings);
+        const response = await api("POST", "", { ...details(), ...changes });
+        expect(response.status).to.equal(400);
+        expect(response.body).to.have.property("error");
+        expect(data.listings).to.deep.equal(before);
+      });
+    }
+
+    for (const body of [undefined, null, [], "text"]) {
+      it(`rejects a nonobject or missing body: ${JSON.stringify(body)}`, async () => {
+        const before = structuredClone(data.listings);
+        expect((await api("POST", "", body)).status).to.equal(400);
+        expect(data.listings).to.deep.equal(before);
+      });
+    }
+  });
+});
