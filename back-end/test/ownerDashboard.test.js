@@ -101,4 +101,71 @@ describe("Owner dashboard API (#110)", () => {
     app.locals.mockDataStore.load = async () => { throw Object.assign(new Error("private-key"), { status: 502 }); };
     expect(await dashboard()).to.deep.equal({ status: 502, body: { error: "Could not load mock data." } });
   });
+
+  for (const [search, ids] of [
+    ["  vAcUuM  ", [104]],
+    ["hAnA", [104]],
+    ["student-3", [104]],
+    ["", [101, 102, 103, 104, 105, 106, 107, 108]],
+    ["   ", [101, 102, 103, 104, 105, 106, 107, 108]],
+    ["Projector", []],
+    ["no matching rental", []],
+  ]) {
+    it(`searches owner rentals for ${JSON.stringify(search)} without changing totals`, async () => {
+      const response = await dashboard(`?search=${encodeURIComponent(search)}`);
+      expect(response.status).to.equal(200);
+      expect(response.body.rentals.map((rental) => rental.id)).to.deep.equal(ids);
+      expect(response.body.summary).to.deep.equal({ totalRentals: 8, activeRentals: 2, recordedIncome: 0.3 });
+    });
+  }
+
+  for (const [status, ids] of [
+    ["all", [101, 102, 103, 104, 105, 106, 107, 108]],
+    ["completed", [101, 102]],
+    ["active", [103]],
+    ["extension_requested", [104]],
+    ["requested", [105]],
+    ["confirmed", [106]],
+    ["declined", [107]],
+    ["cancelled", [108]],
+  ]) {
+    it(`filters ${status} rentals without changing totals`, async () => {
+      const response = await dashboard(`?status=${status}`);
+      expect(response.status).to.equal(200);
+      expect(response.body.rentals.map((rental) => rental.id)).to.deep.equal(ids);
+      expect(response.body.summary).to.deep.equal({ totalRentals: 8, activeRentals: 2, recordedIncome: 0.3 });
+    });
+  }
+
+  it("combines search and status filters without modifying shared data", async () => {
+    const before = structuredClone(data);
+    expect((await dashboard("?search=lamp&status=completed")).body.rentals.map((rental) => rental.id))
+      .to.deep.equal([101, 102]);
+    expect((await dashboard("?search=vacuum&status=completed")).body.rentals).to.deep.equal([]);
+    expect(data).to.deep.equal(before);
+  });
+
+  it("searches actual names and IDs rather than missing-record display labels", async () => {
+    data.listings = [];
+    data.users = [];
+    expect((await dashboard("?search=Listing%20unavailable")).body.rentals).to.deep.equal([]);
+    const response = await dashboard("?search=student-3");
+    expect(response.body.rentals.map((rental) => rental.id)).to.deep.equal([104]);
+    expect(response.body.rentals[0]).to.include({ listingTitle: "Listing unavailable", borrowerName: "student-3" });
+  });
+
+  for (const query of [
+    "status=", "status=overdue", "status=ACTIVE", "status=all&status=active",
+    "search=lamp&search=vacuum", "status[]=active", "status[name]=active",
+    "search[]=lamp", "search[name]=lamp", "ownerId=student-2", "sort=price",
+  ]) {
+    it(`rejects invalid filters before loading data: ${query}`, async () => {
+      let loads = 0;
+      app.locals.mockDataStore.load = async () => { loads += 1; throw new Error("Must not load"); };
+      expect(await dashboard(`?${query}`)).to.deep.equal({
+        status: 400, body: { error: "Invalid dashboard filters." },
+      });
+      expect(loads).to.equal(0);
+    });
+  }
 });

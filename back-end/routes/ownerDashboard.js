@@ -1,8 +1,18 @@
 import { Router } from "express";
+import { rentalStatuses } from "../../shared/options.mjs";
 
 export const ownerDashboardRouter = Router();
 
 ownerDashboardRouter.get("/dashboard", async (request, response) => {
+  const query = request.query;
+  const { search = "", status = "all" } = query;
+  if (Object.keys(query).some((key) => !["search", "status"].includes(key)) ||
+      typeof search !== "string" || typeof status !== "string" ||
+      (status !== "all" && !rentalStatuses.includes(status))) {
+    return response.status(400).json({ error: "Invalid dashboard filters." });
+  }
+
+  const searchText = search.trim().toLowerCase();
   const data = await request.app.locals.mockDataStore.load();
   const ownedRentals = data.rentals.filter((rental) => rental.ownerId === request.currentUserId);
   const listings = new Map(data.listings.map((listing) => [listing.id, listing]));
@@ -13,7 +23,12 @@ ownerDashboardRouter.get("/dashboard", async (request, response) => {
     recordedIncome: Math.round(ownedRentals.filter((rental) => rental.status === "completed")
       .reduce((total, rental) => total + rental.totalPrice, 0) * 100) / 100,
   };
-  const rentals = ownedRentals.map((rental) => ({
+  const filteredRentals = ownedRentals.filter((rental) => {
+    if (status !== "all" && rental.status !== status) return false;
+    return [listings.get(rental.listingId)?.title ?? "", users.get(rental.borrowerId)?.name ?? "", rental.borrowerId]
+      .some((value) => value.toLowerCase().includes(searchText));
+  });
+  const rentals = filteredRentals.map((rental) => ({
     ...rental,
     listingTitle: listings.get(rental.listingId)?.title ?? "Listing unavailable",
     borrowerName: users.get(rental.borrowerId)?.name ?? rental.borrowerId,
