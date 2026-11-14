@@ -17,11 +17,21 @@ ownerDashboardRouter.get("/dashboard", async (request, response) => {
   const ownedRentals = data.rentals.filter((rental) => rental.ownerId === request.currentUserId);
   const listings = new Map(data.listings.map((listing) => [listing.id, listing]));
   const users = new Map(data.users.map((user) => [user.id, user]));
+  let income = 0;
+  let correction = 0;
+  // Preserve low-order digits when adding many completed rental prices.
+  for (const rental of ownedRentals) {
+    if (rental.status !== "completed") continue;
+    const price = rental.totalPrice - correction;
+    const total = income + price;
+    correction = (total - income) - price;
+    income = total;
+  }
   const summary = {
     totalRentals: ownedRentals.length,
     activeRentals: ownedRentals.filter((rental) => ["active", "extension_requested"].includes(rental.status)).length,
-    recordedIncome: Math.round(ownedRentals.filter((rental) => rental.status === "completed")
-      .reduce((total, rental) => total + rental.totalPrice, 0) * 100) / 100,
+    // Compensate for floating-point error at half-cent boundaries.
+    recordedIncome: Math.round((income + Number.EPSILON * Math.max(1, income)) * 100) / 100,
   };
   const filteredRentals = ownedRentals.filter((rental) => {
     if (status !== "all" && rental.status !== status) return false;

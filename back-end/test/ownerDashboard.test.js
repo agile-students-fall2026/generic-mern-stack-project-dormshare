@@ -81,6 +81,25 @@ describe("Owner dashboard API (#110)", () => {
     expect((await dashboard()).body.summary).to.deep.equal({ totalRentals: 6, activeRentals: 2, recordedIncome: 0 });
   });
 
+  for (const [price, expected] of [[1.005, 1.01], [10.075, 10.08]]) {
+    it(`rounds a completed total of ${price} to ${expected}`, async () => {
+      data.rentals = [{ ...data.rentals[0], totalPrice: price }];
+      expect((await dashboard()).body.summary.recordedIncome).to.equal(expected);
+    });
+  }
+
+  it("rounds the combined income rather than each rental separately", async () => {
+    data.rentals = data.rentals.slice(0, 2).map((rental) => ({ ...rental, totalPrice: 0.004 }));
+    expect((await dashboard()).body.summary.recordedIncome).to.equal(0.01);
+  });
+
+  it("preserves cent rounding across many completed rentals", async () => {
+    data.rentals = Array.from({ length: 100 }, (_, index) => ({
+      ...data.rentals[0], id: 1000 + index, totalPrice: 0.10075,
+    }));
+    expect((await dashboard()).body.summary.recordedIncome).to.equal(10.08);
+  });
+
   it("reflects later rental and display-name changes in the shared store", async () => {
     await dashboard();
     data.rentals[0].status = "active";
