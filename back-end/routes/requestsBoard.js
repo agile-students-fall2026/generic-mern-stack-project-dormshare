@@ -1,8 +1,9 @@
 // Requests board route (#114). One list of Quick Borrow and item requests for the board tabs.
 // Same rules as the front-end getBoardRequests(): "mine" shows only the current user's
 // requests, every other tab shows only other people's. Each request gets type "quick" or "item".
+// Item requests show only the responses the current user may see (see itemRequestForViewer).
 import { Router } from "express";
-import { getOpenItemRequests } from "../services/itemRequests.js";
+import { getOpenItemRequests, itemRequestForViewer } from "../services/itemRequests.js";
 
 export const requestsBoardRouter = Router();
 
@@ -17,7 +18,7 @@ requestsBoardRouter.get("/", async (request, response) => {
   const data = await request.app.locals.mockDataStore.load();
   const requests = [
     ...data.quickBorrowRequests.map((item) => ({ ...item, type: "quick" })),
-    ...getOpenItemRequests(data).map((item) => ({ ...item, type: "item" })),
+    ...getOpenItemRequests(data).map((item) => ({ ...itemRequestForViewer(item, request.currentUserId), type: "item" })),
   ];
   const isMine = (item) => String(item.requesterId) === String(request.currentUserId);
 
