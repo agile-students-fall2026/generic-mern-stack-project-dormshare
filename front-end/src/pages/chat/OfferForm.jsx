@@ -21,6 +21,8 @@ function isBackdropEvent(e) {
 }
 
 // Offer / counter-offer dialog (prototype m20). Prefills from the latest offer.
+// onSubmit may return a promise. If it rejects, the server's message is shown and
+// the form keeps its values.
 function OfferForm({ listing, initialOffer, onSubmit, onCancel }) {
   const [form, setForm] = useState({
     totalPrice: initialOffer?.totalPrice ?? '',
@@ -28,6 +30,8 @@ function OfferForm({ listing, initialOffer, onSubmit, onCancel }) {
     endDate: initialOffer?.endDate ?? '',
   })
   const [errors, setErrors] = useState({})
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState(null)
   const dialogRef = useRef(null)
   const totalPriceRef = useRef(null)
   const cancelRef = useRef(null)
@@ -47,10 +51,14 @@ function OfferForm({ listing, initialOffer, onSubmit, onCancel }) {
 
   const days = form.startDate && form.endDate ? countDays(form.startDate, form.endDate) : 0
 
-  const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
+  const handleChange = (e) => {
+    setForm({ ...form, [e.target.name]: e.target.value })
+    setSubmitError(null)
+  }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
+    if (submitting) return
     const found = validate(form)
     const firstInvalid = ['totalPrice', 'startDate', 'endDate'].find((field) => found[field])
     if (firstInvalid) {
@@ -59,7 +67,15 @@ function OfferForm({ listing, initialOffer, onSubmit, onCancel }) {
       input.focus()
       return
     }
-    onSubmit({ ...form, totalPrice: Number(form.totalPrice) })
+    setErrors({})
+    setSubmitting(true)
+    setSubmitError(null)
+    try {
+      await onSubmit({ ...form, totalPrice: Number(form.totalPrice) })
+    } catch (error) {
+      setSubmitError(error)
+      setSubmitting(false)
+    }
   }
 
   const handleCancel = (e) => {
@@ -115,7 +131,7 @@ function OfferForm({ listing, initialOffer, onSubmit, onCancel }) {
           />
           {errors.totalPrice && <span id="chat-offer-total-price-error" className="chat-error" role="alert">{errors.totalPrice}</span>}
         </div>
-        {days > 0 && (
+        {days > 0 && listing && (
           <p className="chat-time">Listed price for {days} day{days === 1 ? '' : 's'}: ${days * listing.price}</p>
         )}
 
@@ -150,8 +166,14 @@ function OfferForm({ listing, initialOffer, onSubmit, onCancel }) {
           </div>
         </div>
 
+        {submitError && (
+          <p className="chat-error" role="alert">Could not send the offer. {submitError.message}</p>
+        )}
+
         <div className="chat-actions">
-          <button type="submit" className="ds-button ds-button--primary">Send offer</button>
+          <button type="submit" className="ds-button ds-button--primary" disabled={submitting}>
+            {submitting ? 'Sending...' : 'Send offer'}
+          </button>
           <button ref={cancelRef} type="button" className="ds-button ds-button--secondary" onClick={onCancel}>Cancel</button>
         </div>
       </form>
