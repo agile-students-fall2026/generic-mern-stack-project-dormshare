@@ -150,6 +150,7 @@ bookingsRouter.post("/:id/extensions", (request, response) => {
   }
   if (newEndDate < earliestToday()) return fail(response, 400, "newEndDate cannot be in the past.");
 
+  rental.extensionSequence = (rental.extensionSequence ?? 0) + 1;
   rental.status = "extension_requested";
   rental.extensionRequest = { newEndDate, status: "pending" };
   response.status(201).json(rental);
