@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AuthContext } from '../../context/AuthContext'
 import {
   getNotifications,
   markAllNotificationsRead,
@@ -9,11 +10,27 @@ import {
 import '../../styles/trust.css'
 import './notifications.css'
 
-function Notifications() {
-  const [notifications, setNotifications] = useState(
-    () => getNotifications()
-  )
+function NotificationsForUser() {
+  const [notifications, setNotifications] = useState([])
   const [filter, setFilter] = useState('all')
+  const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState('')
+  const [actionError, setActionError] = useState('')
+  const [pending, setPending] = useState(false)
+  const [reload, setReload] = useState(0)
+
+  useEffect(() => {
+    let active = true
+    getNotifications().then(
+      (items) => {
+        if (active) { setNotifications(items); setLoadError(''); setLoading(false) }
+      },
+      (error) => {
+        if (active) { setLoadError(error.message); setLoading(false) }
+      },
+    )
+    return () => { active = false }
+  }, [reload])
 
   const unreadCount = notifications.filter(
     (notification) => !notification.isRead
@@ -24,18 +41,30 @@ function Notifications() {
       filter === 'all' || !notification.isRead
   )
 
-  function handleReadChange(id, shouldRead) {
-    if (shouldRead) {
-      markNotificationRead(id)
-    } else {
-      markNotificationUnread(id)
+  async function handleReadChange(id, shouldRead) {
+    setPending(true)
+    setActionError('')
+    try {
+      const updated = await (shouldRead
+        ? markNotificationRead(id) : markNotificationUnread(id))
+      setNotifications((items) => items.map((item) => item.id === id ? updated : item))
+    } catch (error) {
+      setActionError(error.message)
+    } finally {
+      setPending(false)
     }
-
-    setNotifications(getNotifications())
   }
 
-  function handleMarkAllRead() {
-    setNotifications(markAllNotificationsRead())
+  async function handleMarkAllRead() {
+    setPending(true)
+    setActionError('')
+    try {
+      setNotifications(await markAllNotificationsRead())
+    } catch (error) {
+      setActionError(error.message)
+    } finally {
+      setPending(false)
+    }
   }
 
   return (
@@ -91,14 +120,25 @@ function Notifications() {
           <button
             type="button"
             className="ds-button ds-button--secondary notifications-mark-all"
-            disabled={unreadCount === 0}
+            disabled={pending || unreadCount === 0}
             onClick={handleMarkAllRead}
           >
             Mark all as read
           </button>
         </div>
 
-        {visibleNotifications.length === 0 ? (
+        {actionError && <p role="alert">Could not update notification. {actionError}</p>}
+        {loading ? (
+          <p role="status">Loading notifications...</p>
+        ) : loadError ? (
+          <p role="alert">
+            Could not load notifications. {loadError}{' '}
+            <button type="button" onClick={() => {
+              setLoading(true)
+              setReload((value) => value + 1)
+            }}>Retry</button>
+          </p>
+        ) : visibleNotifications.length === 0 ? (
           <div className="trust-empty notifications-empty">
             <h2>
               {filter === 'unread'
@@ -159,6 +199,7 @@ function Notifications() {
 
                     <button
                       type="button"
+                      disabled={pending}
                       className="ds-button ds-button--secondary notifications-read-action"
                       aria-label={`${readAction} for ${notification.title}`}
                       onClick={() =>
@@ -176,6 +217,12 @@ function Notifications() {
       </section>
     </main>
   )
+}
+
+// Reset notification state when another student signs in.
+function Notifications() {
+  const { currentUser } = useContext(AuthContext)
+  return <NotificationsForUser key={currentUser?.id ?? 'guest'} />
 }
 
 export default Notifications
