@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import OfferForm from './OfferForm'
+import { createUpdateCounter, draftAfterSend } from './conversationState'
 import { CURRENT_USER_ID, formatDate, getListing, listingImage } from '../../services/bookings'
 import { formatSentAt, getLatestOffer, getOtherParticipant, getPendingOffer } from '../../services/chat'
 import {
@@ -62,6 +63,14 @@ function ConversationView({ initialConversation }) {
   const [offerFormOpen, setOfferFormOpen] = useState(false)
   const [pending, setPending] = useState(false)
   const [actionError, setActionError] = useState(null)
+  const [updates] = useState(createUpdateCounter)
+
+  // Every change to the conversation goes through here, so a slower, older refresh
+  // can tell it has been overtaken.
+  const showConversation = (next) => {
+    updates.next()
+    setConversation(next)
+  }
 
   const listing = getListing(conversation.listingId)
   const other = getOtherParticipant(conversation, CURRENT_USER_ID)
@@ -73,7 +82,8 @@ function ConversationView({ initialConversation }) {
 
   // Runs one change against the API. Buttons are disabled while it is in flight, and a
   // failure keeps the draft. After a failure the conversation is reloaded, so an offer
-  // the other student already answered or countered stops showing as pending.
+  // the other student already answered or countered stops showing as pending. That
+  // reload is shown only if nothing newer (such as a successful retry) came first.
   const run = async (action) => {
     if (pending) return false
     setPending(true)
@@ -83,7 +93,11 @@ function ConversationView({ initialConversation }) {
       return true
     } catch (error) {
       setActionError(error)
-      fetchConversation(conversation.id).then(setConversation, () => {})
+      const refresh = updates.next()
+      fetchConversation(conversation.id).then(
+        (fresh) => { if (updates.isLatest(refresh)) setConversation(fresh) },
+        () => {},
+      )
       return false
     } finally {
       setPending(false)
@@ -92,15 +106,17 @@ function ConversationView({ initialConversation }) {
 
   const handleSend = async (e) => {
     e.preventDefault()
-    const text = draft.trim()
+    const sentDraft = draft
+    const text = sentDraft.trim()
     if (!text) return
-    const sent = await run(async () => setConversation(await sendChatMessage(conversation.id, text)))
-    if (sent) setDraft('')
+    const sent = await run(async () => showConversation(await sendChatMessage(conversation.id, text)))
+    // Keep anything typed while the message was sending.
+    if (sent) setDraft((current) => draftAfterSend(current, sentDraft))
   }
 
   // Rejects on failure so the offer form can show the message and keep its values.
   const handleOffer = async (offer) => {
-    setConversation(await sendChatOffer(conversation.id, offer))
+    showConversation(await sendChatOffer(conversation.id, offer))
     setOfferFormOpen(false)
   }
 
@@ -110,7 +126,7 @@ function ConversationView({ initialConversation }) {
   })
 
   const handleDecline = () => run(async () => {
-    setConversation(await declineChatOffer(conversation.id, pendingOffer.id))
+    showConversation(await declineChatOffer(conversation.id, pendingOffer.id))
   })
 
   return (
