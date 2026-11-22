@@ -470,6 +470,28 @@ Existing non-account routes retain the `owner-1` fallback without a token.
 This is not production authentication.
 
 
+## Notifications API (#101)
+
+Notifications are derived from the shared rentals, reviews, and conversation
+messages for the current user. Notification read state is stored separately
+in memory per user and resets when the backend restarts.
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/api/notifications` | List current-user notifications |
+| PATCH | `/api/notifications/:id` | Set `{ "isRead": true }` or `false` |
+| POST | `/api/notifications/read-all` | Mark current-user notifications read |
+
+GET returns notifications containing `id`, `title`, `message`, `to`,
+`category`, `priority`, `createdAt`, and `isRead`. Results are ordered by
+priority, then available timestamps. Message timestamps come from `sentAt`;
+rental notifications use available rental creation timestamps. Older
+rentals without a timestamp return `createdAt: null`.
+
+PATCH rejects invalid `isRead` values with 400 and notifications unavailable
+to the current user with 404. Read and unread updates do not affect other
+users. Notification identities distinguish repeated extension requests.
+
 ## Tests
 
 ```sh

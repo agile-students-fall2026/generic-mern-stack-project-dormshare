@@ -1,16 +1,26 @@
 import { Router } from "express";
 
 const sameId = (a, b) => String(a) === String(b);
-const formatDate = (date) => new Date(`${date}T00:00:00Z`).toLocaleDateString("en-US", {
-  month: "short", day: "numeric", timeZone: "UTC",
-});
+const formatDate = (value) => {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return "a date not yet available";
+  }
+  const date = new Date(`${value}T00:00:00Z`);
+  if (Number.isNaN(date.getTime()) || date.toISOString().slice(0, 10) !== value) {
+    return "a date not yet available";
+  }
+  return date.toLocaleDateString("en-US", {
+    month: "short", day: "numeric", timeZone: "UTC",
+  });
+};
 
 function generate(data, userId) {
   const titles = new Map(data.listings.map((item) => [item.id, item.title]));
   const names = new Map(data.users.map((user) => [user.id, user.name]));
   const notifications = [];
-  const add = (id, title, message, to, category, priority, order) =>
-    notifications.push({ id, title, message, to, category, priority, order });
+  const today = new Date().toLocaleDateString("en-CA");
+  const add = (id, title, message, to, category, priority, createdAt) =>
+    notifications.push({ id, title, message, to, category, priority, createdAt });
 
   for (const rental of data.rentals) {
     const owner = sameId(rental.ownerId, userId);
@@ -21,7 +31,8 @@ function generate(data, userId) {
     const otherId = owner ? rental.borrowerId : rental.ownerId;
     const other = names.get(otherId) ?? "Another student";
     const link = `/bookings/${rental.id}`;
-    const overdue = rental.status === "active" && rental.endDate < new Date().toISOString().slice(0, 10);
+    const overdue = ["active", "extension_requested"].includes(rental.status) &&
+      rental.endDate < today;
     let event;
 
     switch (rental.status) {
@@ -32,7 +43,9 @@ function generate(data, userId) {
         if (borrower) event = ["Rental request declined", `Your request for ${item} was declined.`, link, 2];
         break;
       case "confirmed":
-        event = ["Booking confirmed", `Your booking for ${item} is confirmed. Arrange pickup with ${other}.`, link, 3];
+        event = ["Booking confirmed", owner
+          ? `You confirmed ${other}'s request for ${item}. Arrange pickup.`
+          : `Your booking for ${item} is confirmed. Arrange pickup with ${other}.`, link, 3];
         break;
       case "active":
         event = overdue
@@ -47,9 +60,11 @@ function generate(data, userId) {
       case "completed": {
         const reviewed = data.reviews.some((review) =>
           sameId(review.bookingId, rental.id) && sameId(review.reviewerId, userId));
+        const completion = owner
+          ? `The rental of ${item} to ${other} is complete.`
+          : `Your rental of ${item} from ${other} is complete.`;
         event = ["Rental completed", reviewed
-          ? `Your rental for ${item} is complete.`
-          : `Your rental for ${item} is complete. Leave a review.`,
+          ? completion : `${completion} Leave a review.`,
         reviewed ? link : `${link}/review`, 2];
         break;
       }
@@ -58,18 +73,30 @@ function generate(data, userId) {
         break;
     }
 
-    if (event) add(`rental-${rental.id}-${overdue ? "overdue" : rental.status}`,
-      ...event.slice(0, 3), "Rental", event[3], Number(rental.id));
+    const eventKey = rental.status === "extension_requested"
+      ? `extension_requested-${rental.extensionSequence ?? 0}`
+      : overdue ? "overdue" : rental.status;
+    if (event) add(`rental-${rental.id}-${eventKey}`,
+      ...event.slice(0, 3), "Rental", event[3], rental.createdAt ?? null);
+
+    // A pending extension does not erase an overdue return reminder.
+    if (overdue && rental.status === "extension_requested") {
+      add(`rental-${rental.id}-overdue`, "Return overdue",
+        `${item} was due on ${formatDate(rental.endDate)}. Coordinate the return.`,
+        link, "Rental", 6, rental.endDate);
+    }
 
     const outcome = rental.extensionRequest?.status;
     if (rental.status === "active" && borrower && ["approved", "declined"].includes(outcome)) {
       const approved = outcome === "approved";
       const end = rental.extensionRequest.newEndDate;
-      add(`rental-${rental.id}-extension-${outcome}-${end}`,
+      const revision = Number.isSafeInteger(rental.extensionSequence) &&
+        rental.extensionSequence > 0 ? `-${rental.extensionSequence}` : "";
+      add(`rental-${rental.id}-extension-${outcome}-${end}${revision}`,
         approved ? "Extension approved" : "Extension declined",
         approved ? `Your extension for ${item} was approved. New return date: ${formatDate(end)}.`
           : `Your extension request for ${item} was declined.`,
-        `${link}/extension`, "Rental", 5, Number(rental.id));
+        `${link}/extension`, "Rental", 5, rental.createdAt ?? null);
     }
   }
 
@@ -82,10 +109,14 @@ function generate(data, userId) {
     const offer = last.type === "offer";
     add(`message-${conversation.id}-${last.id}`, offer ? "Offer received" : "New message",
       `${sender} sent ${offer ? "an offer" : "a message"} about ${item}.`,
-      `/inbox?conversation=${conversation.id}`, "Message", 4, Number(last.id));
+      `/inbox?conversation=${conversation.id}`, "Message", 4, last.sentAt);
   }
 
-  return notifications.sort((a, b) => b.priority - a.priority || b.order - a.order);
+  const time = (value) => Date.parse(value) || 0;
+  return notifications.sort((a, b) =>
+    b.priority - a.priority ||
+    time(b.createdAt) - time(a.createdAt) ||
+    a.id.localeCompare(b.id));
 }
 
 export function createNotificationsRouter() {

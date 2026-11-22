@@ -49,7 +49,8 @@ describe("Notifications API (#101)", () => {
   it("marks notifications read/unread independently for each user", async () => {
     const path = "/notifications/rental-101-completed";
     expect(await request("PATCH", path, { isRead: true })).to.include({ status: 200 });
-    expect((await request("GET", "/notifications")).body[0].isRead).to.equal(true);
+    expect((await request("GET", "/notifications")).body
+      .find((n) => n.id === "rental-101-completed").isRead).to.equal(true);
     expect((await request("GET", "/notifications", undefined, token)).body
       .find((n) => n.id === "rental-101-completed").isRead).to.equal(false);
     expect((await request("PATCH", path, { isRead: false })).body.isRead).to.equal(false);
@@ -84,5 +85,191 @@ describe("Notifications API (#101)", () => {
     expect(owner.some((n) => n.title === "Extension approved")).to.equal(false);
     expect(borrower.find((n) => n.id === "rental-101-extension-approved-2099-01-02").to)
       .to.equal("/bookings/101/extension");
+  });
+
+  it("keeps a repeated extension request unread after the first was declined", async () => {
+    const rental = data.rentals[0];
+    rental.status = "active";
+    rental.endDate = "2099-01-01";
+    rental.extensionRequest = null;
+
+    expect((await request("POST", "/bookings/101/extensions",
+      { newEndDate: "2099-01-03" }, token)).status).to.equal(201);
+
+    const first = (await request("GET", "/notifications")).body
+      .find((n) => n.title === "Extension request received");
+    expect(first).to.exist;
+    expect((await request("PATCH", `/notifications/${first.id}`,
+      { isRead: true })).status).to.equal(200);
+
+    expect((await request("PATCH", "/bookings/101/extensions",
+      { approve: false })).status).to.equal(200);
+
+    expect((await request("POST", "/bookings/101/extensions",
+      { newEndDate: "2099-01-05" }, token)).status).to.equal(201);
+
+    const second = (await request("GET", "/notifications")).body
+      .find((n) => n.title === "Extension request received");
+    expect(second).to.exist;
+    expect(second.id).not.to.equal(first.id);
+    expect(second.isRead).to.equal(false);
+  });
+
+  it("sorts equal-priority events by timestamps instead of unrelated IDs", async () => {
+    const original = data.rentals[0];
+    data.rentals.push(
+      { ...original, id: 502, status: "requested", createdAt: "2026-01-01" },
+      { ...original, id: 501, status: "requested", createdAt: "2026-12-01" },
+    );
+
+    const owner = (await request("GET", "/notifications")).body;
+    expect(owner.filter((n) => n.title === "New rental request").map((n) => n.id))
+      .to.deep.equal(["rental-501-requested", "rental-502-requested"]);
+    expect(owner.find((n) => n.id === "rental-501-requested").createdAt)
+      .to.equal("2026-12-01");
+
+    const conversation = data.conversations[0];
+    const originalMessage = conversation.messages[0];
+    data.conversations.push(
+      { ...conversation, id: 2, messages: [
+        { ...originalMessage, id: 99, sentAt: "2025-01-01T09:00:00Z" },
+      ] },
+      { ...conversation, id: 3, messages: [
+        { ...originalMessage, id: 1, sentAt: "2026-12-01T09:00:00Z" },
+      ] },
+    );
+
+    const student = (await request("GET", "/notifications", undefined, token)).body;
+    const messages = student.filter((n) => n.category === "Message");
+    expect(messages.map((n) => n.id))
+      .to.deep.equal(["message-3-1", "message-1-1", "message-2-99"]);
+    expect(messages[0].createdAt).to.equal("2026-12-01T09:00:00Z");
+  });
+
+  it("shows overdue and extension notifications together without duplicate IDs", async () => {
+    const rental = data.rentals[0];
+    rental.status = "extension_requested";
+    rental.endDate = "2000-01-01";
+    rental.extensionRequest = {
+      status: "pending",
+      newEndDate: "2099-01-05",
+    };
+
+    const owner = (await request("GET", "/notifications")).body;
+
+    expect(owner.filter((n) => n.id === "rental-101-overdue"))
+      .to.have.length(1);
+    expect(owner.some((n) => n.title === "Extension request received"))
+      .to.equal(true);
+    expect(new Set(owner.map((n) => n.id)).size).to.equal(owner.length);
+
+    const borrower = (await request("GET", "/notifications", undefined, token)).body;
+    expect(borrower.some((n) => n.title === "Return overdue")).to.equal(true);
+    expect(borrower.some((n) => n.title === "Extension request pending"))
+      .to.equal(true);
+
+    rental.status = "active";
+    rental.extensionRequest.status = "declined";
+
+    const afterDecline = (await request("GET", "/notifications")).body;
+    expect(afterDecline.filter((n) => n.id === "rental-101-overdue"))
+      .to.have.length(1);
+    expect(afterDecline.some((n) => n.title === "Extension request received"))
+      .to.equal(false);
+  });
+
+  it("uses role-specific wording and handles malformed return dates", async () => {
+    const rental = data.rentals[0];
+
+    const ownerCompleted = (await request("GET", "/notifications")).body
+      .find((n) => n.title === "Rental completed");
+    const borrowerCompleted = (await request("GET", "/notifications", undefined, token)).body
+      .find((n) => n.title === "Rental completed");
+
+    expect(ownerCompleted.message).to.include("to Item borrower");
+    expect(borrowerCompleted.message).to.include("from Item owner");
+
+    rental.status = "confirmed";
+
+    const ownerConfirmed = (await request("GET", "/notifications")).body
+      .find((n) => n.title === "Booking confirmed");
+    const borrowerConfirmed = (await request("GET", "/notifications", undefined, token)).body
+      .find((n) => n.title === "Booking confirmed");
+
+    expect(ownerConfirmed.message).to.include("You confirmed");
+    expect(borrowerConfirmed.message).to.include("Your booking");
+
+    rental.status = "active";
+
+    for (const endDate of [undefined, "2026-02-30", "invalid"]) {
+      rental.endDate = endDate;
+      const items = (await request("GET", "/notifications")).body;
+      expect(items.some((n) => n.message.includes("Invalid Date"))).to.equal(false);
+      expect(items.some((n) => n.message.includes("a date not yet available")))
+        .to.equal(true);
+    }
+  });
+
+  it("mark-all-read leaves another user's notifications unchanged", async () => {
+    const before = (await request("GET", "/notifications", undefined, token)).body;
+    expect(before.some((n) => !n.isRead)).to.equal(true);
+
+    const result = await request("POST", "/notifications/read-all");
+    expect(result.status).to.equal(200);
+    expect(result.body.every((n) => n.isRead)).to.equal(true);
+
+    const after = (await request("GET", "/notifications", undefined, token)).body;
+    expect(after).to.deep.equal(before);
+  });
+
+  it("does not notify the sender of their own latest message", async () => {
+    data.conversations[0].messages.push({
+      id: 2,
+      senderId: "student-2",
+      type: "text",
+      text: "Thanks!",
+      sentAt: "2026-11-20T10:00:00Z",
+    });
+
+    const sender = (await request("GET", "/notifications", undefined, token)).body;
+    expect(sender.some((n) => n.category === "Message")).to.equal(false);
+
+    const recipient = (await request("GET", "/notifications")).body;
+    expect(recipient.find((n) => n.id === "message-1-2")).to.include({
+      category: "Message",
+      isRead: false,
+    });
+  });
+
+  it("keeps repeated extension outcomes unread even for the same date", async () => {
+    const rental = data.rentals[0];
+    rental.status = "active";
+    rental.endDate = "2099-01-01";
+    rental.extensionRequest = null;
+
+    async function requestAndDecline() {
+      expect((await request("POST", "/bookings/101/extensions",
+        { newEndDate: "2099-01-03" }, token)).status).to.equal(201);
+      expect((await request("PATCH", "/bookings/101/extensions",
+        { approve: false })).status).to.equal(200);
+    }
+
+    await requestAndDecline();
+
+    const first = (await request("GET", "/notifications", undefined, token)).body
+      .find((n) => n.title === "Extension declined");
+
+    expect(first).to.exist;
+    expect((await request("PATCH", `/notifications/${first.id}`,
+      { isRead: true }, token)).status).to.equal(200);
+
+    await requestAndDecline();
+
+    const second = (await request("GET", "/notifications", undefined, token)).body
+      .find((n) => n.title === "Extension declined");
+
+    expect(second).to.exist;
+    expect(second.id).not.to.equal(first.id);
+    expect(second.isRead).to.equal(false);
   });
 });
