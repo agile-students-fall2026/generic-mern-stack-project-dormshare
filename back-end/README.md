@@ -342,7 +342,8 @@ GET `/api/requests-board` takes an optional `type` query: `all` (the default),
 `quick`, `item`, or `mine`. Each request in the response has `type` set to
 `quick` or `item`. `mine` returns only the current user's requests, and every
 other type returns only other people's. `quick` and `item` limit the list to one
-kind, and item requests are included only while `open`. Any other `type` returns
+kind, and item requests are included only while `open`. Only the requester sees every entry in an item request's `responses`;
+other students see just their own. Any other `type` returns
 400. The board only reads item requests. Creating and answering them is not part
 of these routes.
 
