@@ -10,6 +10,22 @@ import {
 import '../../styles/trust.css'
 import './notifications.css'
 
+function formatCreatedAt(value) {
+  if (typeof value !== 'string' || !value) return null
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return null
+
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    ...(value.includes('T')
+      ? { hour: 'numeric', minute: '2-digit' }
+      : { timeZone: 'UTC' }),
+  }).format(date)
+}
+
 function NotificationsForUser() {
   const [notifications, setNotifications] = useState([])
   const [filter, setFilter] = useState('all')
@@ -157,6 +173,7 @@ function NotificationsForUser() {
               const readAction = notification.isRead
                 ? 'Mark as unread'
                 : 'Mark as read'
+              const createdLabel = formatCreatedAt(notification.createdAt)
 
               return (
                 <li
@@ -185,6 +202,14 @@ function NotificationsForUser() {
 
                   <span className="trust-meta notifications-category">
                     {notification.category}
+                    {createdLabel && (
+                      <>
+                        {' · '}
+                        <time dateTime={notification.createdAt}>
+                          {createdLabel}
+                        </time>
+                      </>
+                    )}
                   </span>
 
                   <div className="notifications-actions">

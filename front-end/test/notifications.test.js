@@ -4,6 +4,7 @@ import { createApp } from '../../back-end/app.js'
 import { mockData } from '../../back-end/test/fixtures.js'
 import { startTestServer } from '../../back-end/test/helpers/server.js'
 import { setSessionToken } from '../src/services/api.js'
+import { confirmReturnRequest } from '../src/services/bookingsApi.js'
 import {
   getNotifications, getUnreadCount, markAllNotificationsRead,
   markNotificationRead, markNotificationUnread,
@@ -64,4 +65,49 @@ test('notification API failures are surfaced instead of falling back to mock dat
   await assert.rejects(getNotifications(), {
     name: 'ApiError', status: 503, message: 'Notifications unavailable.',
   })
+})
+
+test('confirming a return updates server notifications', async (t) => {
+  const data = mockData()
+  const rental = data.rentals[0]
+  rental.status = 'active'
+  rental.endDate = '2000-01-01'
+
+  const app = createApp({ store: { load: async () => data } })
+  const server = await startTestServer(app)
+  const nativeFetch = globalThis.fetch
+
+  t.after(async () => {
+    globalThis.fetch = nativeFetch
+    setSessionToken(null)
+    await server.close()
+  })
+
+  globalThis.fetch = (url, options) =>
+    nativeFetch(new URL(url, server.baseUrl), options)
+  setSessionToken(null)
+
+  const overdueId = 'rental-101-overdue-2000-01-01'
+
+  const before = await getNotifications()
+  assert.equal(
+    before.find((item) => item.id === overdueId)?.title,
+    'Return overdue'
+  )
+
+  // Use the actual frontend service, not a direct fixture mutation.
+  const completed = await confirmReturnRequest(101, {
+    condition: 'As described',
+  })
+
+  assert.equal(completed.status, 'completed')
+  assert.equal(rental.status, 'completed')
+
+  const after = await getNotifications()
+
+  assert.equal(
+    after.find((item) => item.id === 'rental-101-completed')?.title,
+    'Rental completed'
+  )
+  assert.equal(after.some((item) => item.id === overdueId), false)
 })
