@@ -23,7 +23,9 @@ Set `MOCKAROO_API_KEY` in the new `.env` using the team's private key. Then run:
 npm run dev
 ```
 
-The server uses `http://127.0.0.1:3001`. Restart it after changing `.env`.
+The server uses `http://127.0.0.1:3001`. Restart it after changing environment files.
+Exported environment values take priority, followed by `back-end/.env.local`,
+then `back-end/.env`. These files are resolved relative to the backend server.
 MongoDB is not required for the Sprint 2 mock API.
 
 - `GET /api/health` returns `{ "status": "ok" }` without loading data.
@@ -56,8 +58,9 @@ IDs are numbers. Bookings use the `rentals` array and its `borrowerId`, `ownerId
 `listingId`, `terms`, and `extensionRequest` fields. A missing optional
 `quickBorrowRequests` collection becomes an empty array.
 
-`currentUser` sets `request.currentUserId` to `owner-1`. It ignores identity
-headers. This is the placeholder for #92, not a login system.
+`currentUser` resolves valid bearer sessions. Without a bearer, existing
+non-account features retain the `owner-1` fallback. Account profile routes
+require a real session.
 
 Validation and option values live in `../shared/`. The frontend imports the same
 rules through its existing service and option paths.
@@ -300,6 +303,52 @@ dates and total. The borrower is the participant who does not own the listing.
 Accepting returns 409 if the offer's dates have passed or the listing is no
 longer published.
 
+## Quick Borrow and requests board routes (#114)
+
+`routes/quickBorrow.js` and `routes/requestsBoard.js` read and add requests in the
+shared store. Nothing is saved to a database yet.
+
+| Method | Path | Response |
+| --- | --- | --- |
+| GET | `/api/quick-borrow` | Every Quick Borrow request, newest first |
+| POST | `/api/quick-borrow` | Created request with status `open`, status 201 |
+| GET | `/api/requests-board` | Quick Borrow and open item requests for one board tab, newest first |
+
+A Quick Borrow request looks like this:
+
+```json
+{
+  "id": 3,
+  "requesterId": "owner-1",
+  "itemName": "Stapler",
+  "neededBy": "2026-12-01",
+  "neededTime": "14:30",
+  "borrowDuration": "20 minutes",
+  "approximateArea": "Library",
+  "details": "Just for one form.",
+  "status": "open",
+  "createdAt": "2026-11-20T15:00:00.000Z"
+}
+```
+
+POST accepts `{ "itemName", "neededBy", "neededTime", "borrowDuration", "approximateArea", "details" }`.
+`itemName`, `borrowDuration`, `approximateArea`, and `details` must be non-empty
+text and are trimmed. `neededBy` must be a real `YYYY-MM-DD` date. `neededTime` is
+optional text and defaults to an empty string. Anything else returns 400. The
+server sets `id`, `requesterId` (the current user), `status`, and `createdAt`, and
+ignores those fields in the body.
+
+GET `/api/requests-board` takes an optional `type` query: `all` (the default),
+`quick`, `item`, or `mine`. Each request in the response has `type` set to
+`quick` or `item`. `mine` returns only the current user's requests, and every
+other type returns only other people's. `quick` and `item` limit the list to one
+kind, and item requests are included only while `open`. Any other `type` returns
+400. The board only reads item requests. Creating and answering them is not part
+of these routes.
+
+Frontend integration is not done yet. The pages still use `localStorage` and the
+mock data.
+
 
 ## Handoff routes (#113)
 
@@ -336,6 +385,7 @@ gets 403 and any other status gets 409, so confirming twice returns 409. Unknown
 rental IDs return 404, and people outside the rental get 403 on every route,
 including GET. Checks run in this order: rental (404, 403), body (400), role (403),
 status (409). Changes stay in the shared store until restart.
+The frontend pickup and return screen uses these routes (#111).
 
 
 ## Reviews and reputation routes (#96)
@@ -422,6 +472,74 @@ signup responses rather than emailed. Accounts and sessions reset on restart.
 Existing non-account routes retain the `owner-1` fallback without a token.
 This is not production authentication.
 
+
+## Password recovery (#139)
+
+Keep these settings in the backend environment only:
+
+```dotenv
+BREVO_API_KEY=
+RECOVERY_FROM=
+RECOVERY_FROM_NAME=DormShare
+```
+
+Use a Brevo API key and a sender mailbox verified in that account. Never put
+the key in a `VITE_` setting or commit private environment files. Missing or
+invalid recovery configuration returns a safe 503 without disabling signup
+or login. Brevo requests use HTTPS, a ten-second timeout, and no automatic retry.
+
+| Method | Endpoint | Body |
+| --- | --- | --- |
+| POST | `/api/auth/forgot-password` | `{ email }` |
+| POST | `/api/auth/verify-reset-code` | `{ email, code }` |
+| POST | `/api/auth/reset-password` | `{ resetToken, password }` |
+
+A valid email request receives the same 202 confirmation for registered and
+unknown addresses. An emailed eight-digit code expires after 15 minutes. Five
+wrong submissions exhaust that code without locking the account. Correct proof
+consumes the code and returns a single-use reset permission that expires after
+five minutes. It cannot authenticate other account requests.
+
+The password must follow the existing 8-128 character rule. A successful reset
+keeps the user and verification state, revokes that user's sessions, and sends
+a separate password-change notice. It does not sign the user in. Codes,
+permissions, and registered credentials remain in memory and are lost when the
+backend restarts.
+
+Email requests are limited per address and direct socket IP. Verification and
+reset share an IP attempt limit. Delivery work and metadata are bounded. See
+the [recovery design](../docs/superpowers/specs/2026-11-21-account-recovery-design.md)
+for exact limits and delivery ordering rules. A recipient-specific delivery
+failure does not change the public confirmation. Notice failure cannot undo a
+password change.
+
+Local use needs no public app URL: read the code from the email and enter it
+in the running app. Public deployment still needs HTTPS. Normal automated
+tests inject a private capture adapter and synthetic data. They do not contact
+Brevo or require an inbox. Any live email check needs an agreed recipient and
+send approval.
+
+## Notifications API (#101)
+
+Notifications are derived from the shared rentals, reviews, and conversation
+messages for the current user. Notification read state is stored separately
+in memory per user and resets when the backend restarts.
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/api/notifications` | List current-user notifications |
+| PATCH | `/api/notifications/:id` | Set `{ "isRead": true }` or `false` |
+| POST | `/api/notifications/read-all` | Mark current-user notifications read |
+
+GET returns notifications containing `id`, `title`, `message`, `to`,
+`category`, `priority`, `createdAt`, and `isRead`. Results are ordered by
+priority, then available timestamps. Message timestamps come from `sentAt`;
+rental notifications use available rental creation timestamps. Older
+rentals without a timestamp return `createdAt: null`.
+
+PATCH rejects invalid `isRead` values with 400 and notifications unavailable
+to the current user with 404. Read and unread updates do not affect other
+users. Notification identities distinguish repeated extension requests.
 
 ## Tests
 
