@@ -15,6 +15,7 @@ import { createRenterDashboardRouter } from "./routes/renterDashboard.js";
 import { createMockDataStore } from "./services/mockData.js";
 import { accountRouter } from "./routes/accounts.js";
 import { reviewsRouter } from "./routes/reviews.js";
+import { createNotificationsRouter } from "./routes/notifications.js";
 
 const frontendDist = fileURLToPath(new URL("../front-end/dist/", import.meta.url));
 const listingImages = fileURLToPath(
@@ -29,6 +30,7 @@ export function createApp({ store = createMockDataStore() } = {}) {
   app.use(currentUser);
   app.use("/api", accountRouter);
   app.use("/api", reviewsRouter);
+  app.use("/api", createNotificationsRouter());
 
   app.get("/api/health", (_request, response) => {
     response.json({ status: "ok" });
