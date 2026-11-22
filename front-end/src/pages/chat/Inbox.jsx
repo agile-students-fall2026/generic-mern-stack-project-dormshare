@@ -1,9 +1,9 @@
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Conversation from './Conversation'
 import { CURRENT_USER_ID, formatDate, getListing, listingImage } from '../../services/bookings'
-import {
-  formatSentAt, getConversations, getLastMessage, getOtherParticipant,
-} from '../../services/chat'
+import { formatSentAt, getLastMessage, getOtherParticipant } from '../../services/chat'
+import { fetchConversations } from '../../services/chatApi'
 import '../../styles/messages.css'
 import './chat.css'
 
@@ -24,27 +24,53 @@ function Inbox() {
   if (conversationId) {
     return <Conversation key={conversationId} conversationId={conversationId} />
   }
+  return <ConversationList />
+}
 
-  const conversations = getConversations(CURRENT_USER_ID)
+// Loads the current user's conversations from the API (#104).
+function ConversationList() {
+  const [result, setResult] = useState(null)
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    let current = true
+    fetchConversations().then(
+      (conversations) => { if (current) setResult({ conversations }) },
+      (error) => { if (current) setResult({ error }) },
+    )
+    return () => { current = false }
+  }, [attempt])
 
   return (
     <main className="ds-page ds-messages chat-page">
       <h1 className="ds-heading">Messages</h1>
-      {conversations.length === 0 ? (
+      {!result ? (
+        <p className="ds-feedback" role="status">Loading conversations...</p>
+      ) : result.error ? (
+        <>
+          <p className="ds-feedback ds-feedback--error" role="alert">
+            Could not load conversations. {result.error.message}
+          </p>
+          <button type="button" className="ds-button ds-button--secondary" onClick={() => {
+            setResult(null)
+            setAttempt((value) => value + 1)
+          }}>Try again</button>
+        </>
+      ) : result.conversations.length === 0 ? (
         <p className="ds-feedback">No conversations yet.</p>
       ) : (
-        conversations.map((c) => {
+        result.conversations.map((c) => {
           const listing = getListing(c.listingId)
           const other = getOtherParticipant(c, CURRENT_USER_ID)
           const last = getLastMessage(c)
           return (
             <Link key={c.id} to={`/inbox?conversation=${c.id}`} className="ds-message-surface chat-card chat-row">
-              <img src={listingImage(listing.id, 96)} alt={listing.title} />
+              <img src={listingImage(c.listingId, 96)} alt={listing?.title ?? ''} />
               <div className="chat-row-text">
-                <h2>{other?.name}</h2>
-                <p className="chat-item-title">{listing.title}</p>
-                <p>{previewText(last)}</p>
-                <span className="chat-time">{formatSentAt(last.sentAt)}</span>
+                <h2>{other?.name ?? 'Student'}</h2>
+                <p className="chat-item-title">{listing?.title ?? 'Listing unavailable'}</p>
+                {last && <p>{previewText(last)}</p>}
+                {last && <span className="chat-time">{formatSentAt(last.sentAt)}</span>}
               </div>
             </Link>
           )

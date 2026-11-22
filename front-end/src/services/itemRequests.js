@@ -1,7 +1,9 @@
 // Item request service (#57). Pages call these functions instead of touching the
 // shared store directly, so they can later be swapped for backend requests.
 // Requests come from the shared Mockaroo data in mockDataService.js.
+import { api } from './api.js'
 import {
+  cacheConversation,
   createItemRequest,
   getItemRequests as getAllItemRequests,
   getListingsForOwner,
@@ -102,6 +104,20 @@ export function respondToRequest(requestId, responderId, { listingId, message = 
       : [...request.responses, { responderId, conversationId, messageIds }],
   })
   return conversationId
+}
+
+// Responds through the back-end (#105), which creates or continues the chat on the
+// server so the chat pages can open it (#104). Pass totalPrice to include an offer for
+// the requested dates. Resolves to the conversation ID; rejects with an ApiError.
+export async function sendItemRequestResponse(requestId, { listingId, message = '', totalPrice }) {
+  const { request, conversation } = await api(`/item-requests/${encodeURIComponent(requestId)}/responses`, {
+    method: 'POST',
+    // A <select> gives the listing ID as text, but the route needs a number.
+    body: { listingId: Number(listingId), message, totalPrice },
+  })
+  cacheConversation(conversation)
+  updateItemRequest(request.id, { responses: request.responses })
+  return conversation.id
 }
 
 // The newest response to a request: who sent it, and their latest offer for it
