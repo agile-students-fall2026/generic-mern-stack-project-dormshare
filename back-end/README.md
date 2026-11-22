@@ -384,15 +384,15 @@ GET `/api/requests-board` takes an optional `type` query: `all` (the default),
 `quick`, `item`, or `mine`. Each request in the response has `type` set to
 `quick` or `item`. `mine` returns only the current user's requests, and every
 other type returns only other people's. `quick` and `item` limit the list to one
-kind, and item requests are included only while `open`. Only the requester sees every entry in an item request's `responses`;
-other students see just their own. Any other `type` returns
+kind, and item requests are included only while `open`. Only the requester sees
+every entry in an item request's `responses`; other students see just their own. Any other `type` returns
 400. The board only reads item requests. Creating and answering them is not part
 of these routes.
 
 The Quick Borrow form posts to `POST /api/quick-borrow` and the requests board
-loads `GET /api/requests-board`. Item requests are still created in the browser
-only, because there is no route for them yet, so the board adds the ones posted in
-this browser to the server's list.
+loads `GET /api/requests-board`. The item request pages are not connected to
+`/api/item-requests` yet (#109), so item requests are still created in the browser
+only, and the board adds the ones posted in this browser to the server's list.
 
 
 ## Handoff routes (#113)
