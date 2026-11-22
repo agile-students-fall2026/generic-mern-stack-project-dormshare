@@ -346,8 +346,10 @@ kind, and item requests are included only while `open`. Any other `type` returns
 400. The board only reads item requests. Creating and answering them is not part
 of these routes.
 
-Frontend integration is not done yet. The pages still use `localStorage` and the
-mock data.
+The Quick Borrow form posts to `POST /api/quick-borrow` and the requests board
+loads `GET /api/requests-board`. Item requests are still created in the browser
+only, because there is no route for them yet, so the board adds the ones posted in
+this browser to the server's list.
 
 
 ## Handoff routes (#113)
