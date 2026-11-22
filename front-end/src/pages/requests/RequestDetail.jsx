@@ -3,7 +3,7 @@ import { flushSync } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { formatDate, formatMoney } from '../../services/bookings'
 import {
-  closeItemRequest, getItemRequest, getOfferableListings, respondToRequest,
+  closeItemRequest, getItemRequest, getOfferableListings, sendItemRequestResponse,
 } from '../../services/itemRequests'
 import { CURRENT_USER_ID, getUser } from '../../services/mockDataService'
 import './requests.css'
@@ -21,6 +21,7 @@ function RequestDetail({ requestId }) {
     message: '',
   })
   const [errors, setErrors] = useState({})
+  const [sending, setSending] = useState(false)
 
   if (!request) {
     return (
@@ -38,7 +39,9 @@ function RequestDetail({ requestId }) {
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
-  const respond = (withOffer) => {
+  // The server creates or continues the chat (#105), so the chat page can open it (#104).
+  const respond = async (withOffer) => {
+    if (sending) return
     const found = {}
     if (!form.listingId) found.listingId = 'Choose one of your listings.'
     if (withOffer && (form.totalPrice === '' || !(Number(form.totalPrice) >= 0))) {
@@ -52,13 +55,18 @@ function RequestDetail({ requestId }) {
     }
     setErrors(found)
 
-    const conversationId = respondToRequest(request.id, CURRENT_USER_ID, {
-      listingId: form.listingId,
-      message: form.message,
-      totalPrice: withOffer ? Number(form.totalPrice) : undefined,
-    })
-    if (conversationId) navigate(`/inbox?conversation=${conversationId}`)
-    else setErrors({ form: 'This request can no longer be answered.' })
+    setSending(true)
+    try {
+      const conversationId = await sendItemRequestResponse(request.id, {
+        listingId: form.listingId,
+        message: form.message,
+        totalPrice: withOffer ? Number(form.totalPrice) : undefined,
+      })
+      navigate(`/inbox?conversation=${conversationId}`)
+    } catch (error) {
+      setErrors({ form: `Could not send your response. ${error.message}` })
+      setSending(false)
+    }
   }
 
   return (
@@ -139,8 +147,12 @@ function RequestDetail({ requestId }) {
           {errors.form && <p className="ds-feedback ds-feedback--error" role="alert">{errors.form}</p>}
 
           <div className="ds-message-actions">
-            <button type="submit" className="ds-button ds-button--primary">Send offer in chat</button>
-            <button className="ds-button ds-button--secondary" type="button" onClick={() => respond(false)}>Message requester</button>
+            <button type="submit" className="ds-button ds-button--primary" disabled={sending}>
+              {sending ? 'Sending...' : 'Send offer in chat'}
+            </button>
+            <button className="ds-button ds-button--secondary" type="button" disabled={sending} onClick={() => respond(false)}>
+              Message requester
+            </button>
           </div>
         </form>
       ))}
