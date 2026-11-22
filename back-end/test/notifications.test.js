@@ -81,7 +81,7 @@ describe("Notifications API (#101)", () => {
     data.rentals[0].extensionRequest = { status: "approved", newEndDate: "2099-01-02" };
     const owner = (await request("GET", "/notifications")).body;
     const borrower = (await request("GET", "/notifications", undefined, token)).body;
-    expect(owner.find((n) => n.id === "rental-101-overdue").title).to.equal("Return overdue");
+    expect(owner.find((n) => n.id === "rental-101-overdue-2000-01-01").title).to.equal("Return overdue");
     expect(owner.some((n) => n.title === "Extension approved")).to.equal(false);
     expect(borrower.find((n) => n.id === "rental-101-extension-approved-2099-01-02").to)
       .to.equal("/bookings/101/extension");
@@ -157,7 +157,7 @@ describe("Notifications API (#101)", () => {
 
     const owner = (await request("GET", "/notifications")).body;
 
-    expect(owner.filter((n) => n.id === "rental-101-overdue"))
+    expect(owner.filter((n) => n.id === "rental-101-overdue-2000-01-01"))
       .to.have.length(1);
     expect(owner.some((n) => n.title === "Extension request received"))
       .to.equal(true);
@@ -172,7 +172,7 @@ describe("Notifications API (#101)", () => {
     rental.extensionRequest.status = "declined";
 
     const afterDecline = (await request("GET", "/notifications")).body;
-    expect(afterDecline.filter((n) => n.id === "rental-101-overdue"))
+    expect(afterDecline.filter((n) => n.id === "rental-101-overdue-2000-01-01"))
       .to.have.length(1);
     expect(afterDecline.some((n) => n.title === "Extension request received"))
       .to.equal(false);
@@ -271,5 +271,78 @@ describe("Notifications API (#101)", () => {
     expect(second).to.exist;
     expect(second.id).not.to.equal(first.id);
     expect(second.isRead).to.equal(false);
+  });
+
+  it("creates a fresh overdue alert for a newly missed extended deadline", async () => {
+    const RealDate = globalThis.Date;
+    let now = "2026-01-02T12:00:00Z";
+
+    globalThis.Date = class extends RealDate {
+      constructor(...args) {
+        super(...(args.length ? args : [now]));
+      }
+      static now() {
+        return RealDate.parse(now);
+      }
+    };
+
+    try {
+      const rental = data.rentals[0];
+      rental.status = "active";
+      rental.endDate = "2026-01-01";
+      rental.extensionRequest = null;
+
+      const firstId = "rental-101-overdue-2026-01-01";
+      const secondId = "rental-101-overdue-2026-01-03";
+
+      const first = (await request("GET", "/notifications")).body
+        .find((n) => n.id === firstId);
+
+      expect(first).to.exist;
+      expect(first.isRead).to.equal(false);
+
+      expect((await request("PATCH", `/notifications/${firstId}`,
+        { isRead: true })).status).to.equal(200);
+
+      // A pending extension must preserve the original overdue alert.
+      expect((await request("POST", "/bookings/101/extensions",
+        { newEndDate: "2026-01-03" }, token)).status).to.equal(201);
+
+      const pending = (await request("GET", "/notifications")).body;
+      expect(pending.find((n) => n.id === firstId).isRead).to.equal(true);
+
+      // Approval moves the deadline and removes the old overdue alert.
+      expect((await request("PATCH", "/bookings/101/extensions",
+        { approve: true })).status).to.equal(200);
+
+      expect(rental.endDate).to.equal("2026-01-03");
+
+      const afterApproval = (await request("GET", "/notifications")).body;
+      expect(afterApproval.some((n) => n.id === firstId)).to.equal(false);
+
+      // The approved deadline passes.
+      now = "2026-01-04T12:00:00Z";
+
+      const second = (await request("GET", "/notifications")).body
+        .find((n) => n.id === secondId);
+
+      expect(second).to.exist;
+      expect(second.isRead).to.equal(false);
+      expect(second.id).not.to.equal(firstId);
+
+      // The same overdue deadline must not generate a new ID daily.
+      expect((await request("PATCH", `/notifications/${secondId}`,
+        { isRead: true })).status).to.equal(200);
+
+      now = "2026-01-05T12:00:00Z";
+
+      const nextDay = (await request("GET", "/notifications")).body
+        .find((n) => n.id === secondId);
+
+      expect(nextDay).to.exist;
+      expect(nextDay.isRead).to.equal(true);
+    } finally {
+      globalThis.Date = RealDate;
+    }
   });
 });

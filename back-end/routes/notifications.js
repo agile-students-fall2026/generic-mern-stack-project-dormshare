@@ -75,13 +75,13 @@ function generate(data, userId) {
 
     const eventKey = rental.status === "extension_requested"
       ? `extension_requested-${rental.extensionSequence ?? 0}`
-      : overdue ? "overdue" : rental.status;
+      : overdue ? `overdue-${rental.endDate}` : rental.status;
     if (event) add(`rental-${rental.id}-${eventKey}`,
       ...event.slice(0, 3), "Rental", event[3], rental.createdAt ?? null);
 
     // A pending extension does not erase an overdue return reminder.
     if (overdue && rental.status === "extension_requested") {
-      add(`rental-${rental.id}-overdue`, "Return overdue",
+      add(`rental-${rental.id}-overdue-${rental.endDate}`, "Return overdue",
         `${item} was due on ${formatDate(rental.endDate)}. Coordinate the return.`,
         link, "Rental", 6, rental.endDate);
     }
