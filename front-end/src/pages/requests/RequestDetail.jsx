@@ -13,6 +13,9 @@ import '../../styles/messages.css'
 // requester about one of your published listings.
 function RequestDetail({ requestId }) {
   const navigate = useNavigate()
+  // Reads the browser's cached copy. A request created on the server after the page
+  // loaded shows up on the board but isn't here, so it would say "Request not found".
+  // Load it from GET /api/item-requests/:id when item requests are connected (#109).
   const [request, setRequest] = useState(() => getItemRequest(requestId))
   const listings = getOfferableListings(CURRENT_USER_ID)
   const [form, setForm] = useState({
