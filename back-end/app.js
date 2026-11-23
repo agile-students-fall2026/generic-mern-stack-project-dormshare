@@ -27,10 +27,11 @@ const listingImages = fileURLToPath(
   new URL("../front-end/public/listing-images/", import.meta.url),
 );
 
-export function createApp({ store = createMockDataStore(), recovery } = {}) {
+export function createApp({ store = createMockDataStore(), recovery, demoLogin = false } = {}) {
   const app = express();
   app.locals.mockDataStore = store;
   app.locals.auth = { credentials: new Map(), sessions: new Map() };
+  app.locals.demoLoginEnabled = demoLogin === true && process.env.NODE_ENV !== "production";
   app.locals.recovery = createRecovery({ ...recovery, store, auth: app.locals.auth });
   app.use(express.json());
   app.use("/api/auth", createRecoveryRouter(app.locals.recovery));

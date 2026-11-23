@@ -3,8 +3,8 @@ import { Link, useNavigate, useParams } from 'react-router-dom'
 import {
   CURRENT_USER_ID,
   getUser,
-  listingImage,
 } from '../../services/bookings'
+import ListingImage from '../../components/ListingImage.jsx'
 import { cacheListing } from '../../services/mockDataService.js'
 import { getPublicListing } from '../../services/publicListings.js'
 import SaveListingButton, { SavedItemsStatus } from '../../components/SaveListingButton.jsx'
@@ -131,8 +131,8 @@ function ListingDetails({ listing }) {
           <p className="ds-item-category">{listing.category}</p>
           <h1 className="ds-heading" id="item-title">{listing.title}</h1>
           <div className="ds-item-image">
-            <img
-              src={listingImage(listing.id, 480)}
+            <ListingImage
+              listingId={listing.id}
               alt={listing.title}
               width={480}
               height={480}

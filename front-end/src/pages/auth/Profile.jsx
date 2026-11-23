@@ -29,16 +29,17 @@ function Profile() {
         </h2>
         <p>
           <span className="ds-status">
-            {currentUser.emailVerified
+            {currentUser.isDemo ? 'Sample account' : currentUser.emailVerified
               ? 'Demo email confirmed'
               : 'Demo email not confirmed'}
           </span>
         </p>
-        <p>{currentUser.email}</p>
+        {currentUser.email && <p>{currentUser.email}</p>}
         {currentUser.campusArea && <p>{currentUser.campusArea}</p>}
         <p className="ds-account-help">
-          This profile is part of the account demo.
-          Account changes reset when you reload.
+          {currentUser.isDemo
+            ? 'You are using shared sample data. Changes reset when the backend restarts.'
+            : 'This profile is part of the account demo. Account changes reset when you reload.'}
         </p>
       </section>
 
@@ -113,9 +114,9 @@ function Profile() {
           <Link to="/report" className="ds-text-link">
             Report a problem
           </Link>
-          <Link to="/setup-profile" className="ds-text-link">
+          {!currentUser.isDemo && <Link to="/setup-profile" className="ds-text-link">
             Edit profile
-          </Link>
+          </Link>}
         </nav>
         <button
           type="button"

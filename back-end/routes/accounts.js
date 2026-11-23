@@ -5,8 +5,17 @@ import { Router } from "express";
 export const accountRouter = Router();
 
 const emailOf = (value) => typeof value === "string" ? value.trim().toLowerCase() : "";
-const profile = ({ id, email, displayName, campusArea, emailVerified }) =>
-  ({ id, email, displayName, campusArea, emailVerified });
+const isSeededUser = (user) => !user.id.startsWith("account-");
+const profile = (user) => {
+  if (isSeededUser(user)) {
+    return {
+      id: user.id, email: "", displayName: user.name, campusArea: user.campusArea ?? "",
+      emailVerified: false, isDemo: true,
+    };
+  }
+  const { id, email, displayName, campusArea, emailVerified } = user;
+  return { id, email, displayName, campusArea, emailVerified };
+};
 const fail = (res, status, error) => res.status(status).json({ error });
 
 function session(request, user) {
@@ -24,6 +33,29 @@ async function requireAccount(request, response, next) {
   if (!request.accountUser) return fail(response, 401, "Account not found.");
   next();
 }
+
+// Explicit local testing access to seeded identities only. Registered accounts
+// always require the normal password and verification flow.
+accountRouter.get("/auth/demo-users", async (request, response) => {
+  if (!request.app.locals.demoLoginEnabled) return fail(response, 404, "Demo sign-in is unavailable.");
+  const data = await request.app.locals.mockDataStore.load();
+  response.json(data.users.filter(isSeededUser).map((user) => ({
+    id: user.id,
+    displayName: user.name,
+    borrowedRentals: data.rentals.filter((rental) => rental.borrowerId === user.id).length,
+    conversations: data.conversations.filter((chat) => chat.participantIds.includes(user.id)).length,
+  })));
+});
+
+accountRouter.post("/auth/demo-login", async (request, response) => {
+  if (!request.app.locals.demoLoginEnabled) return fail(response, 404, "Demo sign-in is unavailable.");
+  const { userId } = request.body ?? {};
+  if (typeof userId !== "string" || !userId.trim()) return fail(response, 400, "Choose a sample user.");
+  const { users } = await request.app.locals.mockDataStore.load();
+  const user = users.find((item) => item.id === userId && isSeededUser(item));
+  if (!user) return fail(response, 404, "Sample user not found.");
+  response.json(session(request, user));
+});
 
 // Create an NYU account. Verification is simulated for the Sprint 2 demo.
 accountRouter.post("/auth/signup", async (request, response) => {
@@ -101,6 +133,7 @@ accountRouter.get("/users/me", requireAccount, (request, response) => {
 });
 
 accountRouter.put("/users/me", requireAccount, (request, response) => {
+  if (isSeededUser(request.accountUser)) return fail(response, 403, "Sample profiles cannot be edited.");
   const { displayName, campusArea } = request.body ?? {};
 
   if (![displayName, campusArea].every(

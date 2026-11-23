@@ -3,12 +3,14 @@ import { useContext, useLayoutEffect, useRef, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext'
+import DemoLogin from './DemoLogin'
 import '../../styles/accounts.css'
 
 function Login() {
   const { signIn, pendingSignup } = useContext(AuthContext)
   const [message, setMessage] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [demoBusy, setDemoBusy] = useState(false)
   const mounted = useRef(false)
   const navigate = useNavigate()
 
@@ -19,6 +21,7 @@ function Login() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (submitting || demoBusy) return
 
     const fields = event.currentTarget.elements
     const emailInput = fields.email
@@ -61,6 +64,7 @@ function Login() {
               name="email"
               type="email"
               autoComplete="username"
+              disabled={demoBusy}
               placeholder="student@nyu.edu"
               defaultValue={pendingSignup?.email ?? ''}
               onChange={() => setMessage('')}
@@ -83,6 +87,7 @@ function Login() {
               name="password"
               type="password"
               autoComplete="current-password"
+              disabled={demoBusy}
               onChange={() => setMessage('')}
               required
             />
@@ -90,13 +95,14 @@ function Login() {
           </div>
 
           <div className="ds-account-actions">
-            <button className="ds-button ds-button--primary" type="submit" disabled={submitting}>
+            <button className="ds-button ds-button--primary" type="submit" disabled={submitting || demoBusy}>
               {submitting ? 'Signing in...' : 'Sign in'}
             </button>
             <Link className="ds-text-link" to="/signup">Create account</Link>
           </div>
         </form>
       </section>
+      <DemoLogin disabled={submitting} onBusyChange={setDemoBusy} onSignedIn={() => navigate('/browse')} />
     </main>
   )
 }

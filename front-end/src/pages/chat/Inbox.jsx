@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Conversation from './Conversation'
-import { CURRENT_USER_ID, formatDate, getListing, listingImage } from '../../services/bookings'
+import { CURRENT_USER_ID, formatDate, getListing } from '../../services/bookings'
+import ListingImage from '../../components/ListingImage.jsx'
 import { formatSentAt, getLastMessage, getOtherParticipant } from '../../services/chat'
 import { fetchConversations } from '../../services/chatApi'
 import '../../styles/messages.css'
@@ -65,7 +66,7 @@ function ConversationList() {
           const last = getLastMessage(c)
           return (
             <Link key={c.id} to={`/inbox?conversation=${c.id}`} className="ds-message-surface chat-card chat-row">
-              <img src={listingImage(c.listingId, 96)} alt={listing?.title ?? ''} />
+              <ListingImage listingId={c.listingId} alt={listing?.title ?? ''} />
               <div className="chat-row-text">
                 <h2>{other?.name ?? 'Student'}</h2>
                 <p className="chat-item-title">{listing?.title ?? 'Listing unavailable'}</p>

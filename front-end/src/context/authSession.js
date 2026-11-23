@@ -117,13 +117,13 @@ export function createAuthSession({
     return result.user
   }
 
-  async function signIn(email, password) {
+  async function startSession(path, body) {
     invalidatedThrough = lastRequestId
     const requestId = ++lastRequestId
 
-    const session = await api('/auth/login', {
+    const session = await api(path, {
       method: 'POST',
-      body: { email, password },
+      body,
     })
 
     const { user } = await api('/users/me', {
@@ -144,6 +144,9 @@ export function createAuthSession({
 
     return user
   }
+
+  const signIn = (email, password) => startSession('/auth/login', { email, password })
+  const signInDemo = (userId) => startSession('/auth/demo-login', { userId })
 
   async function updateProfile(displayName, campusArea) {
     const requestToken = token
@@ -203,6 +206,7 @@ export function createAuthSession({
     signUp,
     verifyEmail,
     signIn,
+    signInDemo,
     updateProfile,
     signOut,
     prepareResetSignOut,

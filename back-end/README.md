@@ -590,6 +590,40 @@ PATCH rejects invalid `isRead` values with 400 and notifications unavailable
 to the current user with 404. Read and unread updates do not affect other
 users. Notification identities distinguish repeated extension requests.
 
+## Sample-user sign-in
+
+For local testing with the existing Mockaroo rentals and chats, add
+`DEMO_LOGIN_ENABLED=true` to your private `back-end/.env`, then restart the
+backend. Open Sign in and use **Try a demo account** to select a sample user.
+The selector shows that user's borrowed-rental and conversation counts.
+
+The feature is disabled by default. It is always disabled when
+`NODE_ENV=production`, even if the flag is set. No frontend environment file is
+needed. Registered accounts cannot be opened through demo sign-in and still
+require their normal password and verification flow.
+
+| Method | Path | Behavior |
+| --- | --- | --- |
+| GET | `/api/auth/demo-users` | Minimal seeded-user IDs, names, and activity counts |
+| POST | `/api/auth/demo-login` | Accept `{ "userId": "owner-1" }` and return a normal session |
+
+Both routes return 404 when disabled. Demo sessions use the selected seed ID,
+so existing rental, chat, listing, and request ownership checks still apply.
+Demo profiles are labeled as sample accounts and cannot be edited. Other
+sample actions change shared in-memory data until the backend restarts.
+
+After building the frontend, browser checks can be run without provider keys
+or real emails:
+
+```sh
+PLAYWRIGHT_MODULE=/absolute/path/to/playwright/index.mjs \
+PLAYWRIGHT_BROWSER=chromium node --test scripts/demo-access.browser.mjs
+```
+
+Run this from the repository root. Use `PLAYWRIGHT_BROWSER=webkit` for WebKit.
+The suite covers supplied images, broken-image fallback, sample-user sessions,
+normal password login, retries, and narrow layouts using synthetic data.
+
 ## Tests
 
 ```sh

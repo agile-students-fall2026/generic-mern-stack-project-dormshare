@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { listingImage } from '../services/bookings'
+import ListingImage from './ListingImage.jsx'
 import { CURRENT_USER_ID } from '../services/mockDataService.js'
 import SaveListingButton from './SaveListingButton.jsx'
 
@@ -7,8 +7,8 @@ function ListingCard({ listing }) {
   return (
     <article className="ds-listing-card">
       <div className="ds-listing-media">
-        <img
-          src={listingImage(listing.id, 320)}
+        <ListingImage
+          listingId={listing.id}
           alt={listing.title}
           width={240}
           height={240}
