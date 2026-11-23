@@ -57,6 +57,31 @@ describe("Requests board route (#114)", () => {
     expect(ids((await board("?type=mine")).body)).to.deep.equal(["item-2", "quick-2"]);
   });
 
+  it("shows other people's item requests with only your own responses", async () => {
+    const reply = (responderId, conversationId) => ({ responderId, conversationId, messageIds: [conversationId] });
+    data.itemRequests.find((item) => item.id === 4).responses = [reply("student-3", 7), reply("owner-1", 8)];
+    data.itemRequests.find((item) => item.id === 1).responses = [reply("student-3", 9)];
+    const stored = JSON.stringify(data.itemRequests);
+
+    const { body } = await board("?type=item");
+
+    expect(body.find((item) => item.id === 4).responses).to.deep.equal([reply("owner-1", 8)]);
+    expect(body.find((item) => item.id === 1).responses).to.deep.equal([]);
+    expect(JSON.stringify(data.itemRequests)).to.equal(stored, "the stored requests are not changed");
+  });
+
+  it("shows you every response to your own item request", async () => {
+    const replies = [
+      { responderId: "student-2", conversationId: 7, messageIds: [1] },
+      { responderId: "student-3", conversationId: 8, messageIds: [2] },
+    ];
+    data.itemRequests.find((item) => item.id === 2).responses = replies;
+
+    const { body } = await board("?type=mine");
+
+    expect(body.find((item) => item.id === 2).responses).to.deep.equal(replies);
+  });
+
   it("leaves out closed item requests", async () => {
     const all = (await board()).body.concat((await board("?type=mine")).body);
 

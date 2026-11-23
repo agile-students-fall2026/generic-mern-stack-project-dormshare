@@ -1,7 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import RequestCard from './RequestCard'
-import { REQUEST_TYPES, getBoardRequests } from '../../services/requestsBoard'
+import { REQUEST_TYPES, fetchBoardRequests } from '../../services/requestsBoard'
 import './requestsBoard.css'
 import '../../styles/messages.css'
 
@@ -10,7 +10,22 @@ const TABS = [['all', 'All'], ...Object.entries(REQUEST_TYPES), ['mine', 'My req
 // Shared board of item requests and quick borrow requests.
 function RequestsBoard() {
   const [type, setType] = useState('all')
-  const requests = getBoardRequests(type)
+  const [attempt, setAttempt] = useState(0)
+  // The last answer from the API, tagged with the tab and attempt it was for.
+  const [result, setResult] = useState(null)
+  const key = `${type}:${attempt}`
+
+  useEffect(() => {
+    let current = true
+    fetchBoardRequests(type).then(
+      (requests) => { if (current) setResult({ key, requests }) },
+      (error) => { if (current) setResult({ key, error }) },
+    )
+    return () => { current = false }
+  }, [type, attempt, key])
+
+  const loaded = result?.key === key ? result : null
+  const requests = loaded?.requests ?? []
 
   return (
     <main className="ds-page ds-messages ds-request-board">
@@ -40,7 +55,16 @@ function RequestsBoard() {
         ))}
       </div>
 
-      {requests.length === 0 ? (
+      {!loaded ? (
+        <p className="ds-status" role="status">Loading requests...</p>
+      ) : loaded.error ? (
+        <>
+          <p className="ds-feedback ds-feedback--error" role="alert">Could not load requests. {loaded.error.message}</p>
+          <button type="button" className="ds-button ds-button--secondary" onClick={() => setAttempt((value) => value + 1)}>
+            Retry
+          </button>
+        </>
+      ) : requests.length === 0 ? (
         <p className="ds-feedback">{type === 'mine' ? "You haven't posted any requests yet." : 'No requests yet.'}</p>
       ) : (
         <div className="request-board-grid">
