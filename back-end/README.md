@@ -389,6 +389,11 @@ every entry in an item request's `responses`; other students see just their own.
 400. The board only reads item requests. Creating and answering them is not part
 of these routes.
 
+`GET /api/mock-data` hides other students' item request responses too, like the
+board. It is the demo bootstrap, so it still returns the rest of the shared data
+(other people's conversations and bookings) in full until the frontend stops
+loading it.
+
 The Quick Borrow form posts to `POST /api/quick-borrow` and the requests board
 loads `GET /api/requests-board`. The item request pages are not connected to
 `/api/item-requests` yet (#109), so item requests are still created in the browser
