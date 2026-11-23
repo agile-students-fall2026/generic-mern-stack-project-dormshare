@@ -1,4 +1,5 @@
 import { Link, useParams } from 'react-router-dom'
+import MessageButton from '../../components/MessageButton'
 import StatusBadge from '../../components/StatusBadge'
 import BookingLoadState from './BookingLoadState'
 import ExtensionRequestForm from './ExtensionRequestForm'
@@ -47,7 +48,7 @@ function ExtensionPage({ bookingId }) {
             onClick={() => respond(true)}>
             {saving ? 'Saving...' : 'Approve extension'}
           </button>
-          <Link to="/inbox" className="ds-button ds-button--secondary">Message borrower</Link>
+          <MessageButton listingId={booking.listingId} participantId={booking.borrowerId}>Message borrower</MessageButton>
           <button type="button" className="ds-button booking-danger" disabled={saving}
             onClick={() => respond(false)}>
             Decline extension

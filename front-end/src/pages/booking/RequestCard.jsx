@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import MessageButton from '../../components/MessageButton'
 import ListingSummary from './ListingSummary'
 import { formatDate, formatMoney, getListing, getUser } from '../../services/bookings'
 
@@ -27,7 +28,9 @@ function RequestCard({ booking, onDecline, declining = false, disabled = false }
         <Link to={`/bookings/${booking.id}`} className="ds-button ds-button--primary">
           Accept and review booking
         </Link>
-        <Link to="/inbox" className="ds-button ds-button--secondary">Message / counter offer</Link>
+        <MessageButton listingId={booking.listingId} participantId={booking.borrowerId}>
+          Message / counter offer
+        </MessageButton>
         <button type="button" className="ds-button booking-danger" disabled={disabled}
           onClick={() => onDecline(booking.id)}>
           {declining ? 'Declining...' : 'Decline request'}

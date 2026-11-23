@@ -9,6 +9,7 @@ import { cacheListing } from '../../services/mockDataService.js'
 import { getPublicListing } from '../../services/publicListings.js'
 import SaveListingButton, { SavedItemsStatus } from '../../components/SaveListingButton.jsx'
 import Icon from '../../components/Icon.jsx'
+import MessageButton from '../../components/MessageButton.jsx'
 import './itemDetails.css'
 
 function ItemDetails() {
@@ -169,6 +170,9 @@ function ListingDetails({ listing }) {
                 <SavedItemsStatus />
                 <SaveListingButton listing={listing} />
               </div>
+              <MessageButton listingId={listing.id} participantId={listing.ownerId}>
+                Message {owner?.name ?? 'owner'}
+              </MessageButton>
               <form className="ds-rental-form" onSubmit={handleRequest}>
                 <h2>Select rental dates</h2>
                 <div className="ds-date-fields">
