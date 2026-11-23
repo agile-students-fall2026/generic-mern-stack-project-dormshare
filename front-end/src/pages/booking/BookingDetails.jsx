@@ -1,6 +1,7 @@
 import { useContext, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { AuthContext } from '../../context/AuthContext'
+import MessageButton from '../../components/MessageButton'
 import StatusBadge from '../../components/StatusBadge'
 import BookingLoadState from './BookingLoadState'
 import ListingSummary from './ListingSummary'
@@ -177,9 +178,9 @@ function BookingSummary({ bookingId }) {
           </Link>
         )}
 
-        <Link to="/inbox" className="ds-button ds-button--secondary">
+        <MessageButton listingId={booking.listingId} participantId={isOwner ? booking.borrowerId : booking.ownerId}>
           Message {isOwner ? 'borrower' : 'owner'}
-        </Link>
+        </MessageButton>
 
         {canCancel(booking, CURRENT_USER_ID) && (
           <Link to={`/bookings/${booking.id}/cancel`} className="ds-button booking-danger">

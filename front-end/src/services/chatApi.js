@@ -35,6 +35,15 @@ export async function fetchConversation(id) {
   return cacheConversation(await api(path(id)))
 }
 
+// Opens (or reopens) the chat with another student about a listing, so "Message owner"
+// and "Message borrower" buttons land in a real conversation. Text is optional.
+export async function startConversation({ listingId, participantId, text }) {
+  return cacheConversation(await api('/conversations', {
+    method: 'POST',
+    body: { listingId: Number(listingId), participantId, text },
+  }))
+}
+
 // The routes below return only the new or changed message, which is also what
 // reloadAfterChange applies locally if the reload fails.
 export async function sendChatMessage(id, text) {

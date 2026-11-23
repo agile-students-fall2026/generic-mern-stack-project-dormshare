@@ -7,6 +7,7 @@ import { fetchBooking } from '../src/services/bookingsApi.js'
 import { getConversation } from '../src/services/chat.js'
 import {
   acceptChatOffer, declineChatOffer, fetchConversation, fetchConversations, sendChatMessage, sendChatOffer,
+  startConversation,
 } from '../src/services/chatApi.js'
 import { getItemRequest, sendItemRequestResponse } from '../src/services/itemRequests.js'
 import { getConversations, loadMockData } from '../src/services/mockDataService.js'
@@ -139,6 +140,33 @@ describe('Chat and offer API integration (#104)', () => {
     await fetchConversation(1)
     await assert.rejects(sendChatMessage(1, '   '), { name: 'ApiError', status: 400 })
     assert.equal(stored(1).messages.length, 2)
+  })
+
+  describe('starting a conversation from a listing or booking', () => {
+    it('opens a new chat with the owner of a published listing', async () => {
+      data.listings.push({ ...data.listings[1], id: 3, title: 'Speaker' })
+      const conversation = await startConversation({ listingId: '3', participantId: 'student-2' })
+      assert.deepEqual(conversation.participantIds, ['owner-1', 'student-2'])
+      assert.deepEqual(conversation.messages, [])
+      assert.deepEqual(stored(conversation.id), conversation)
+      assert.deepEqual(getConversation(conversation.id), conversation, 'cached so the chat page opens it')
+    })
+
+    it('reopens the existing chat about the same listing', async () => {
+      const conversation = await startConversation({ listingId: 2, participantId: 'student-2' })
+      assert.equal(conversation.id, 1)
+      assert.equal(data.conversations.length, 1)
+    })
+
+    it('surfaces the server message when starting a chat is not allowed', async () => {
+      data.listings.push({ ...data.listings[1], id: 3, title: 'Speaker', status: 'paused' })
+      await assert.rejects(startConversation({ listingId: 3, participantId: 'student-2' }), {
+        name: 'ApiError',
+        status: 403,
+        message: 'You can only message the owner of a published listing or someone you have a booking with.',
+      })
+      assert.equal(data.conversations.length, 1)
+    })
   })
 
   it('responds to an item request with a chat the chat pages can open', async () => {

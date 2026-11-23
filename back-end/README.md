@@ -275,6 +275,7 @@ Frontend integration remains in #97 and #100.
 | Method | Path | Response |
 | --- | --- | --- |
 | GET | `/api/conversations` | Current user's conversations, newest message first |
+| POST | `/api/conversations` | Started (201) or existing (200) conversation |
 | GET | `/api/conversations/:id` | One conversation with all its messages |
 | POST | `/api/conversations/:id/messages` | Created text message, status 201 |
 | POST | `/api/conversations/:id/offers` | Created pending offer, status 201 |
@@ -302,6 +303,13 @@ longer pending returns 409. Accepting adds a `confirmed` booking to the shared
 dates and total. The borrower is the participant who does not own the listing.
 Accepting returns 409 if the offer's dates have passed or the listing is no
 longer published.
+
+`POST /api/conversations` accepts `{ "listingId": 5, "participantId": "student-2", "text": "Is it free?" }`
+and opens the chat between the current user and that student about the listing,
+reusing an existing one. `text` is optional. A student can message the owner of a
+published listing, and either person in a booking can message the other about
+that listing even if it is no longer published. Anything else returns 403. Messaging
+yourself or invalid input returns 400, and an unknown listing or student returns 404.
 
 Message and offer creation lives in `services/conversations.js`, shared with item
 request responses, so both create messages the same way.

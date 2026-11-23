@@ -51,6 +51,81 @@ describe("Conversation and message routes (#102)", () => {
     });
   });
 
+  describe("POST /api/conversations", () => {
+    // Listing 1 (Desk lamp) is owner-1's own, with a completed booking by student-2.
+    // Listing 5 belongs to student-2.
+    beforeEach(() => {
+      data.listings.push({ ...data.listings[0], id: 5, ownerId: "student-2", title: "Projector" });
+    });
+
+    it("starts a chat with the owner of a published listing", async () => {
+      const { status, body } = await request("POST", "", { listingId: 5, participantId: "student-2", text: "  Is it free?  " });
+      expect(status).to.equal(201);
+      expect(body).to.deep.include({ id: 4, listingId: 5, participantIds: ["owner-1", "student-2"] });
+      expect(body.messages).to.have.length(1);
+      expect(body.messages[0]).to.include({ senderId: "owner-1", type: "text", text: "Is it free?" });
+      expect(data.conversations.at(-1)).to.deep.equal(body);
+    });
+
+    it("opens an empty chat when no first message is sent", async () => {
+      const { status, body } = await request("POST", "", { listingId: 5, participantId: "student-2" });
+      expect(status).to.equal(201);
+      expect(body.messages).to.deep.equal([]);
+    });
+
+    it("reuses the existing chat about the same listing", async () => {
+      const { status, body } = await request("POST", "", { listingId: 1, participantId: "student-2", text: "Hi again" });
+      expect(status).to.equal(200);
+      expect(body.id).to.equal(1);
+      expect(body.messages.at(-1).text).to.equal("Hi again");
+      expect(data.conversations).to.have.length(3);
+    });
+
+    it("lets an owner message a student they have a booking with", async () => {
+      data.rentals.push({ ...data.rentals[0], id: 102, borrowerId: "student-3", status: "confirmed" });
+      const { status, body } = await request("POST", "", { listingId: 1, participantId: "student-3" });
+      expect(status).to.equal(201);
+      expect(body.participantIds).to.deep.equal(["owner-1", "student-3"]);
+    });
+
+    it("lets people with a booking message each other about a paused listing", async () => {
+      data.listings.at(-1).status = "paused";
+      data.rentals.push({ ...data.rentals[0], id: 103, listingId: 5, ownerId: "student-2", borrowerId: "owner-1" });
+      expect((await request("POST", "", { listingId: 5, participantId: "student-2" })).status).to.equal(201);
+    });
+
+    for (const [name, setup, body] of [
+      ["an owner messaging a student with no booking", () => {}, { listingId: 1, participantId: "student-3" }],
+      ["a paused listing with no booking", () => { data.listings.at(-1).status = "paused"; }, { listingId: 5, participantId: "student-2" }],
+      ["a student who isn't the listing owner", () => {}, { listingId: 5, participantId: "student-3" }],
+    ]) {
+      it(`returns 403 for ${name} and creates nothing`, async () => {
+        setup();
+        const { status, body: error } = await request("POST", "", body);
+        expect(status).to.equal(403);
+        expect(error.error).to.match(/owner of a published listing/);
+        expect(data.conversations).to.have.length(3);
+      });
+    }
+
+    for (const [name, body, status, error] of [
+      ["a missing listing ID", { participantId: "student-2" }, 400, "A positive integer listingId is required."],
+      ["a string listing ID", { listingId: "5", participantId: "student-2" }, 400, "A positive integer listingId is required."],
+      ["a missing participant", { listingId: 5 }, 400, "participantId is required."],
+      ["non-string text", { listingId: 5, participantId: "student-2", text: 5 }, 400, "Message text must be text."],
+      ["messaging yourself", { listingId: 1, participantId: "owner-1" }, 400, "You cannot message yourself."],
+      ["an unknown listing", { listingId: 999, participantId: "student-2" }, 404, "Listing not found."],
+      ["an unknown student", { listingId: 5, participantId: "nobody" }, 404, "Student not found."],
+    ]) {
+      it(`rejects ${name}`, async () => {
+        const { status: actual, body: response } = await request("POST", "", body);
+        expect(actual).to.equal(status);
+        expect(response).to.deep.equal({ error });
+        expect(data.conversations).to.have.length(3);
+      });
+    }
+  });
+
   describe("GET /api/conversations/:id", () => {
     it("returns a conversation the current user is part of", async () => {
       const { status, body } = await request("GET", "/1");

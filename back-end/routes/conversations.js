@@ -25,6 +25,61 @@ conversationsRouter.get("/", async (request, response) => {
     .sort((a, b) => lastSentAt(b) - lastSentAt(a)));
 });
 
+// Opens a chat with another student about a listing, reusing an existing one. A student
+// can message the owner of a published listing; either person in a booking can message
+// the other about that listing, even if it is no longer published. Owners can't message
+// students they have no booking with. The first message is optional.
+conversationsRouter.post("/", async (request, response) => {
+  const { listingId, participantId, text } = request.body ?? {};
+  const { currentUserId } = request;
+  if (!Number.isSafeInteger(listingId) || listingId < 1) {
+    return response.status(400).json({ error: "A positive integer listingId is required." });
+  }
+  if (typeof participantId !== "string" || !participantId) {
+    return response.status(400).json({ error: "participantId is required." });
+  }
+  if (text !== undefined && typeof text !== "string") {
+    return response.status(400).json({ error: "Message text must be text." });
+  }
+  if (participantId === currentUserId) {
+    return response.status(400).json({ error: "You cannot message yourself." });
+  }
+
+  const data = await request.app.locals.mockDataStore.load();
+  const listing = data.listings.find((item) => item.id === listingId);
+  if (!listing) return response.status(404).json({ error: "Listing not found." });
+  if (!data.users.some((user) => user.id === participantId)) {
+    return response.status(404).json({ error: "Student not found." });
+  }
+
+  const pair = [currentUserId, participantId];
+  const samePair = (ids) => ids.length === 2 && pair.every((id) => ids.includes(id));
+  let conversation = data.conversations.find((item) =>
+    item.listingId === listing.id && samePair(item.participantIds));
+  const created = !conversation;
+
+  if (!conversation) {
+    const sharedBooking = data.rentals.some((rental) =>
+      rental.listingId === listing.id && samePair([rental.ownerId, rental.borrowerId]));
+    const messagingOwner = listing.ownerId === participantId;
+    if (!sharedBooking && !(messagingOwner && listing.status === "published")) {
+      return response.status(403).json({
+        error: "You can only message the owner of a published listing or someone you have a booking with.",
+      });
+    }
+    conversation = {
+      id: Math.max(0, ...data.conversations.map((item) => item.id)) + 1,
+      listingId: listing.id,
+      participantIds: pair,
+      messages: [],
+    };
+    data.conversations.push(conversation);
+  }
+
+  if (text?.trim()) addTextMessage(data, conversation, currentUserId, text.trim());
+  response.status(created ? 201 : 200).json(conversation);
+});
+
 conversationsRouter.get("/:id", (request, response) => {
   response.json(request.conversation);
 });
