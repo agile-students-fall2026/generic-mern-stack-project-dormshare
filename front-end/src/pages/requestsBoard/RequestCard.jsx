@@ -12,6 +12,7 @@ const formatDate = (isoDate) =>
 
 // Summary of the newest reply to one of your item requests, e.g.
 // "Omer offered Projector for $18.00." Returns null when there are no replies.
+// If the reply's chat hasn't loaded yet, it says who replied without guessing what.
 function latestReply(request) {
   const response = getLatestResponse(request)
   if (!response) return null
@@ -19,13 +20,10 @@ function latestReply(request) {
   const name = getUser(response.responderId)?.name ?? 'Someone'
   const { offer } = response
   const listing = getListing(response.listingId)
-  return {
-    conversationId: response.conversationId,
-    hasOffer: Boolean(offer),
-    text: offer
-      ? `${name} offered ${listing?.title ?? 'an item'} for ${formatMoney(offer.totalPrice)}.`
-      : `${name} sent you a message.`,
-  }
+  let text = `${name} sent you a message.`
+  if (!response.chatLoaded) text = `${name} replied.`
+  else if (offer) text = `${name} offered ${listing?.title ?? 'an item'} for ${formatMoney(offer.totalPrice)}.`
+  return { conversationId: response.conversationId, hasOffer: Boolean(offer), text }
 }
 
 // One request on the shared board.

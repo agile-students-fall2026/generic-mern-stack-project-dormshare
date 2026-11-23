@@ -170,6 +170,28 @@ export function updateConversation(id, details) {
   return structuredClone(updatedConversation)
 }
 
+// A full /conversations response replaces the current user's cached conversations,
+// removing any lost after a backend restart, and keeps everyone else's.
+export function cacheConversations(fetchedConversations) {
+  const cached = structuredClone(fetchedConversations)
+  const ids = new Set(cached.map((conversation) => String(conversation.id)))
+  const otherConversations = conversations.filter((conversation) =>
+    !conversation.participantIds.includes(CURRENT_USER_ID) && !ids.has(String(conversation.id)),
+  )
+  conversations = [...cached, ...otherConversations]
+  return structuredClone(cached)
+}
+
+// Keep legacy readers current after a successful conversation API response.
+export function cacheConversation(conversation) {
+  const cached = structuredClone(conversation)
+  const exists = conversations.some((item) => sameId(item.id, cached.id))
+  conversations = exists
+    ? conversations.map((item) => sameId(item.id, cached.id) ? cached : item)
+    : [...conversations, cached]
+  return structuredClone(cached)
+}
+
 export function createConversation(details) {
   const id = Math.max(0, ...conversations.map((item) => item.id)) + 1
   const conversation = { ...details, id }
@@ -190,6 +212,17 @@ export function getItemRequests() {
 // Item requests posted in this browser, which the back-end does not know about yet.
 export function getLocalItemRequests() {
   return structuredClone(itemRequests.filter((item) => localItemRequestIds.has(item.id)))
+}
+
+// Keep legacy readers (board cards, chat summaries) current after a successful
+// item request API response.
+export function cacheItemRequest(request) {
+  const cached = structuredClone(request)
+  const exists = itemRequests.some((item) => sameId(item.id, cached.id))
+  itemRequests = exists
+    ? itemRequests.map((item) => sameId(item.id, cached.id) ? cached : item)
+    : [cached, ...itemRequests]
+  return structuredClone(cached)
 }
 
 export function createItemRequest(details) {
