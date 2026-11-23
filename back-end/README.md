@@ -395,9 +395,8 @@ board. It is the demo bootstrap, so it still returns the rest of the shared data
 loading it.
 
 The Quick Borrow form posts to `POST /api/quick-borrow` and the requests board
-loads `GET /api/requests-board`. The item request pages are not connected to
-`/api/item-requests` yet (#109), so item requests are still created in the browser
-only, and the board adds the ones posted in this browser to the server's list.
+loads `GET /api/requests-board`. The item request pages use `/api/item-requests`
+(#109), so the board shows every request from the server.
 
 
 ## Handoff routes (#113)
