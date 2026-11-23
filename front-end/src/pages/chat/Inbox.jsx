@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Conversation from './Conversation'
+import { useAutoRefresh } from './useAutoRefresh'
 import { CURRENT_USER_ID, formatDate, getListing, listingImage } from '../../services/bookings'
 import { formatSentAt, getLastMessage, getOtherParticipant } from '../../services/chat'
 import { fetchConversations } from '../../services/chatApi'
@@ -40,6 +41,14 @@ function ConversationList() {
     )
     return () => { current = false }
   }, [attempt])
+
+  // Shows new conversations and replies without reloading. Only refreshes a list that
+  // loaded; a failed refresh keeps the list on screen instead of showing an error.
+  useAutoRefresh(async () => {
+    if (!result?.conversations) return
+    const conversations = await fetchConversations()
+    setResult((current) => (current?.conversations ? { conversations } : current))
+  })
 
   return (
     <main className="ds-page ds-messages chat-page">

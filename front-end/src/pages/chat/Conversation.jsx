@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import OfferForm from './OfferForm'
 import { createUpdateCounter, draftAfterSend } from './conversationState'
+import { useAutoRefresh } from './useAutoRefresh'
 import { CURRENT_USER_ID, formatDate, getListing, listingImage } from '../../services/bookings'
 import { formatSentAt, getLatestOffer, getOtherParticipant, getPendingOffer } from '../../services/chat'
 import {
@@ -71,6 +72,15 @@ function ConversationView({ initialConversation }) {
     updates.next()
     setConversation(next)
   }
+
+  // Picks up messages and offer changes from the other student. Skipped while one of
+  // your own changes is saving, and dropped if anything newer was shown meanwhile.
+  useAutoRefresh(async () => {
+    if (pending) return
+    const check = updates.next()
+    const fresh = await fetchConversation(conversation.id)
+    if (updates.isLatest(check)) setConversation(fresh)
+  })
 
   const listing = getListing(conversation.listingId)
   const other = getOtherParticipant(conversation, CURRENT_USER_ID)
