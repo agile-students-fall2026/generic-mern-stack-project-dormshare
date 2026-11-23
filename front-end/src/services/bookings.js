@@ -26,7 +26,23 @@ export const getIncomingRequests = (ownerId) =>
     (rental) => sameId(rental.ownerId, ownerId) && rental.status === 'requested',
   )
 
-export const listingImage = () => '/listing-images/placeholder.png'
+export function listingImage(id) {
+  const image = getListing(id)?.image
+  if (typeof image !== 'string' || !image.trim()) return '/listing-images/placeholder.png'
+
+  try {
+    if (image.startsWith('/listing-images/')) {
+      const local = new URL(image, 'https://dormshare.invalid')
+      if (local.origin === 'https://dormshare.invalid' && local.pathname.startsWith('/listing-images/')) return image
+    } else if (/^https:\/\//i.test(image)) {
+      const remote = new URL(image)
+      if (remote.protocol === 'https:' && !remote.username && !remote.password) return image
+    }
+  } catch {
+    // Unsupported or malformed sources use the same local fallback as missing photos.
+  }
+  return '/listing-images/placeholder.png'
+}
 
 // Bookings changed only in this browser by features that aren't connected to the
 // back-end yet: accepting a chat offer (#104). Pickup and return go through the API

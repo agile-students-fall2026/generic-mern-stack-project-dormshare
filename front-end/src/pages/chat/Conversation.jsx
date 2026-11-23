@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import OfferForm from './OfferForm'
 import { createUpdateCounter, draftAfterSend } from './conversationState'
-import { CURRENT_USER_ID, formatDate, getListing, listingImage } from '../../services/bookings'
+import { CURRENT_USER_ID, formatDate, getListing } from '../../services/bookings'
+import ListingImage from '../../components/ListingImage.jsx'
 import { formatSentAt, getLatestOffer, getOtherParticipant, getPendingOffer } from '../../services/chat'
 import {
   acceptChatOffer, declineChatOffer, fetchConversation, sendChatMessage, sendChatOffer,
@@ -135,7 +136,7 @@ function ConversationView({ initialConversation }) {
       <h1 className="ds-heading">Conversation</h1>
 
       <div className="ds-message-surface chat-card chat-row">
-        <img src={listingImage(conversation.listingId, 96)} alt={listing?.title ?? ''} />
+        <ListingImage listingId={conversation.listingId} alt={listing?.title ?? ''} />
         <div className="chat-row-text">
           <h2>{otherName}</h2>
           <p className="chat-item-title">{listing?.title ?? 'Listing unavailable'}</p>

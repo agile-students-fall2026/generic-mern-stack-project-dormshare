@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { listingCategories, listingStatuses } from '../../data/options.js'
-import { listingImage } from '../../services/bookings.js'
+import ListingImage from '../../components/ListingImage.jsx'
 import { createListing, getMyListings, updateListing, updateListingStatus } from '../../services/listings.js'
 import { validateListingForm } from './listingForm.js'
 import Icon from '../../components/Icon.jsx'
@@ -315,7 +315,7 @@ function MyListings({ initialFormOpen = false }) {
             <h2 id="listing-preview-heading">Listing preview</h2>
             <span className={`ds-listing-status ds-listing-status--${previewListing.status}`}>{formatStatus(previewListing.status)}</span>
           </div>
-          <img className="ds-listing-thumbnail" src={listingImage(previewListing.id)} alt={previewListing.title} />
+          <ListingImage className="ds-listing-thumbnail" listingId={previewListing.id} alt={previewListing.title} />
           <p>{previewListing.category}</p>
           <h3>{previewListing.title}</h3>
           <p>{previewListing.description}</p>
@@ -390,7 +390,7 @@ function MyListings({ initialFormOpen = false }) {
           <div className="ds-management-list">
             {visibleListings.map((listing) => (
               <article className="ds-listing-row" key={listing.id}>
-                <img className="ds-listing-thumbnail" src={listingImage(listing.id)} alt={listing.title} loading="lazy" />
+                <ListingImage className="ds-listing-thumbnail" listingId={listing.id} alt={listing.title} loading="lazy" />
                 <div>
                   <h3>{listing.title}</h3>
                   <p>{listing.category}</p>
