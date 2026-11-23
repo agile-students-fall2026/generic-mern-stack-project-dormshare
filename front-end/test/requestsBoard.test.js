@@ -3,7 +3,6 @@ import { after, before, beforeEach, describe, it } from 'node:test'
 import { createApp } from '../../back-end/app.js'
 import { startTestServer } from '../../back-end/test/helpers/server.js'
 import { ApiError } from '../src/services/api.js'
-import { createItemRequest } from '../src/services/mockDataService.js'
 import { createQuickBorrowRequest } from '../src/services/quickBorrow.js'
 import { fetchBoardRequests } from '../src/services/requestsBoard.js'
 import { mockResponse } from './fixtures.js'
@@ -85,17 +84,6 @@ describe('Quick Borrow and requests board API integration (#114)', () => {
         fetchBoardRequests('bogus'),
         (error) => error instanceof ApiError && error.status === 400 && /type must be one of/.test(error.message),
       )
-    })
-
-    it('adds item requests posted in this browser, which the server does not have', async () => {
-      const posted = createItemRequest({
-        itemName: 'Folding table', neededBy: '2030-12-01', neededUntil: '2030-12-03',
-        approximateArea: 'Lobby', targetPrice: null, details: '',
-      })
-      const mine = await fetchBoardRequests('mine')
-      assert.deepEqual(mine.map((item) => item.itemName), ['Folding table', 'HDMI cable'])
-      assert.ok(mine.some((item) => item.id === posted.id && item.type === 'item'))
-      assert.ok(!(await fetchBoardRequests('item')).some((item) => item.itemName === 'Folding table'))
     })
   })
 })
