@@ -15,23 +15,36 @@ const emptyForm = {
   details: '',
 }
 
-// Create Item Request (prototype m15).
+// Create Item Request (prototype m15). Posts to the back-end (#109); field errors from
+// the form check or the server show under their inputs.
 function CreateItemRequest() {
   const navigate = useNavigate()
   const [form, setForm] = useState(emptyForm)
   const [errors, setErrors] = useState({})
+  const [saving, setSaving] = useState(false)
 
   const handleChange = (e) => setForm({ ...form, [e.target.name]: e.target.value })
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
-    const result = postItemRequest(form)
-    if (result.errors) {
-      flushSync(() => setErrors(result.errors))
-      e.currentTarget.elements[Object.keys(result.errors)[0]]?.focus()
-      return
+    if (saving) return
+    const fields = e.currentTarget.elements
+    setSaving(true)
+    try {
+      const result = await postItemRequest(form)
+      if (result.errors) {
+        flushSync(() => {
+          setErrors(result.errors)
+          setSaving(false)
+        })
+        fields[Object.keys(result.errors)[0]]?.focus()
+        return
+      }
+      navigate('/requests-board')
+    } catch (error) {
+      setErrors({ form: `Could not post your request. ${error.message}` })
+      setSaving(false)
     }
-    navigate('/requests-board')
   }
 
   return (
@@ -80,12 +93,17 @@ function CreateItemRequest() {
 
         <label>
             <span id="request-create-details-label">Additional details (optional)</span>
-            <textarea className="ds-field" name="details" id="request-create-details" aria-labelledby="request-create-details-label" rows="3" value={form.details} onChange={handleChange}
+            <textarea className="ds-field" name="details" id="request-create-details" aria-labelledby="request-create-details-label" aria-invalid={Boolean(errors.details) || undefined} aria-describedby={errors.details ? 'request-create-details-error' : undefined} rows="3" value={form.details} onChange={handleChange}
             placeholder="For a small indoor event" />
+          {errors.details && <span className="ds-message-error" id="request-create-details-error" role="alert">{errors.details}</span>}
         </label>
 
+        {errors.form && <p className="ds-feedback ds-feedback--error" role="alert">{errors.form}</p>}
+
         <div className="ds-message-actions">
-          <button type="submit" className="ds-button ds-button--primary">Post request</button>
+          <button type="submit" className="ds-button ds-button--primary" disabled={saving}>
+            {saving ? 'Posting...' : 'Post request'}
+          </button>
         </div>
       </form>
     </main>

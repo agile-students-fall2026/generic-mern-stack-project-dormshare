@@ -1,35 +1,80 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { flushSync } from 'react-dom'
 import { Link, useNavigate } from 'react-router-dom'
 import { formatDate, formatMoney } from '../../services/bookings'
 import {
-  closeItemRequest, getItemRequest, getOfferableListings, sendItemRequestResponse,
+  closeItemRequest, fetchItemRequest, getOfferableListings, sendItemRequestResponse,
 } from '../../services/itemRequests'
 import { CURRENT_USER_ID, getUser } from '../../services/mockDataService'
 import './requests.css'
 import '../../styles/messages.css'
 
-// Request detail / respond (prototype m16). Responding opens a chat with the
-// requester about one of your published listings.
+// Request detail / respond (prototype m16). Loads the request from the API (#109), so
+// requests posted after the app loaded open too.
 function RequestDetail({ requestId }) {
+  const [result, setResult] = useState(null)
+  const [attempt, setAttempt] = useState(0)
+
+  useEffect(() => {
+    let current = true
+    fetchItemRequest(requestId).then(
+      (request) => { if (current) setResult({ request }) },
+      (error) => { if (current) setResult({ error }) },
+    )
+    return () => { current = false }
+  }, [requestId, attempt])
+
+  if (result?.request) return <RequestView initialRequest={result.request} />
+
+  return (
+    <main className="ds-page ds-messages">
+      {!result ? (
+        <p className="ds-feedback" role="status">Loading request...</p>
+      ) : result.error.status === 404 ? (
+        <h1 className="ds-heading">Request not found</h1>
+      ) : (
+        <>
+          <h1 className="ds-heading">Request</h1>
+          <p className="ds-feedback ds-feedback--error" role="alert">
+            Could not load this request. {result.error.message}
+          </p>
+          <button type="button" className="ds-button ds-button--secondary" onClick={() => {
+            setResult(null)
+            setAttempt((value) => value + 1)
+          }}>Try again</button>
+        </>
+      )}
+      <Link className="ds-text-link" to="/requests-board">Back to requests</Link>
+    </main>
+  )
+}
+
+// Responding opens a chat with the requester about one of your published listings.
+function RequestView({ initialRequest }) {
   const navigate = useNavigate()
-  const [request, setRequest] = useState(() => getItemRequest(requestId))
+  const [request, setRequest] = useState(initialRequest)
   const listings = getOfferableListings(CURRENT_USER_ID)
   const [form, setForm] = useState({
     listingId: listings[0]?.id ?? '',
-    totalPrice: request?.targetPrice ?? '',
+    totalPrice: request.targetPrice ?? '',
     message: '',
   })
   const [errors, setErrors] = useState({})
   const [sending, setSending] = useState(false)
+  const [closing, setClosing] = useState(false)
+  const [closeError, setCloseError] = useState(null)
 
-  if (!request) {
-    return (
-      <main className="ds-page ds-messages">
-        <h1 className="ds-heading">Request not found</h1>
-        <Link className="ds-text-link" to="/requests-board">Back to requests</Link>
-      </main>
-    )
+  const handleClose = async () => {
+    if (closing) return
+    setClosing(true)
+    setCloseError(null)
+    try {
+      setRequest(await closeItemRequest(request.id))
+    } catch (error) {
+      setCloseError(error)
+    } finally {
+      setClosing(false)
+    }
   }
 
   const requester = getUser(request.requesterId)
@@ -74,7 +119,7 @@ function RequestDetail({ requestId }) {
       <Link to="/requests-board" className="ds-text-link">All requests</Link>
 
       <section className="ds-message-surface request-summary">
-        <p className="request-eyebrow">{isOwn ? 'Your request' : `${requester?.name} needs`}</p>
+        <p className="request-eyebrow">{isOwn ? 'Your request' : `${requester?.name ?? 'A student'} needs`}</p>
         <h1 className="ds-heading">{request.itemName}</h1>
         <p>
           {formatDate(request.neededBy)} to {formatDate(request.neededUntil)} · {price} · {request.approximateArea}
@@ -92,16 +137,19 @@ function RequestDetail({ requestId }) {
             <ul className="request-replies">
               {request.responses.map((response) => (
                 <li key={response.conversationId}>
-                  <span>{getUser(response.responderId)?.name}</span>
+                  <span>{getUser(response.responderId)?.name ?? 'Student'}</span>
                   <Link className="ds-text-link" to={`/inbox?conversation=${response.conversationId}`}>Open conversation</Link>
                 </li>
               ))}
             </ul>
           )}
+          {closeError && (
+            <p className="ds-feedback ds-feedback--error" role="alert">Could not close the request. {closeError.message}</p>
+          )}
           {isOpen && (
             <div className="ds-message-actions">
-              <button className="ds-button ds-message-danger" type="button" onClick={() => setRequest(closeItemRequest(request.id))}>
-                Close request
+              <button className="ds-button ds-message-danger" type="button" disabled={closing} onClick={handleClose}>
+                {closing ? 'Closing...' : 'Close request'}
               </button>
             </div>
           )}
