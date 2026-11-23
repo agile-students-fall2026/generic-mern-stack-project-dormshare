@@ -1,281 +1,213 @@
-
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mockResponse } from './fixtures.js'
+import { createApp } from '../../back-end/app.js'
+import { mockData } from '../../back-end/test/fixtures.js'
+import { startTestServer } from '../../back-end/test/helpers/server.js'
+import { setSessionToken } from '../src/services/api.js'
 import {
-  loadMockData,
-  updateRental,
-  updateRentalStatus,
-} from '../src/services/mockDataService.js'
+  sendChatMessage, sendChatOffer, acceptChatOffer,
+} from '../src/services/chatApi.js'
+import { confirmReturnRequest } from '../src/services/bookingsApi.js'
 import {
-  getNotifications,
-  getUnreadCount,
-  markAllNotificationsRead,
-  markNotificationRead,
-  markNotificationUnread,
+  getNotifications, getUnreadCount, markAllNotificationsRead,
+  markNotificationRead, markNotificationUnread,
 } from '../src/services/notifications.js'
 
-test('notifications support rental events, links, and read state', async (t) => {
-  // Start before the fixture's due date so bulk read cannot pre-read the later overdue event.
-  t.mock.timers.enable({ apis: ['Date'], now: new Date('2026-11-06T12:00:00Z') })
-  // Simulate browser storage for persistence testing.
-  const storage = new Map()
-  const originalWindow = globalThis.window
+test('notifications load, persist read state, and isolate users through Express', async (t) => {
+  const data = mockData()
+  data.rentals.push({ ...data.rentals[0], id: 102, status: 'requested' })
+  const app = createApp({ store: { load: async () => data } })
+  const server = await startTestServer(app)
+  const originalFetch = globalThis.fetch
+  t.after(async () => {
+    globalThis.fetch = originalFetch
+    setSessionToken(null)
+    await server.close()
+  })
+  globalThis.fetch = (url, options) => originalFetch(new URL(url, server.baseUrl), options)
+  setSessionToken(null)
 
-  globalThis.window = {
-    localStorage: {
-      getItem: (key) => storage.get(key) ?? null,
-      setItem: (key, value) => storage.set(key, value),
-    },
-  }
+  const before = await getNotifications()
+  const requested = before.find((item) => item.id === 'rental-102-requested')
+  assert.equal(requested?.to, '/bookings/102')
+  assert.equal(requested.isRead, false)
+  assert.equal(await getUnreadCount(), before.length)
 
-  t.after(() => {
-    if (originalWindow === undefined) {
-      delete globalThis.window
-    } else {
-      globalThis.window = originalWindow
-    }
+  assert.equal((await markNotificationRead(requested.id)).isRead, true)
+  assert.equal((await getNotifications()).find((item) => item.id === requested.id).isRead, true)
+  assert.equal((await markNotificationUnread(requested.id)).isRead, false)
+  assert.equal((await getNotifications()).find((item) => item.id === requested.id).isRead, false)
+  assert.ok((await markAllNotificationsRead()).every((item) => item.isRead))
+  assert.equal(await getUnreadCount(), 0)
+  await assert.rejects(markNotificationRead('message-1-1'), { status: 404 })
+
+  data.rentals.at(-1).status = 'confirmed'
+  const changed = await getNotifications()
+  assert.equal(changed.find((item) => item.id === 'rental-102-confirmed').isRead, false)
+  assert.equal(changed.some((item) => item.id === requested.id), false)
+
+  const token = 'a'.repeat(64)
+  app.locals.auth.sessions.set(token, 'student-2')
+  setSessionToken(token)
+  const student = await getNotifications()
+  assert.equal(student.some((item) => item.id === 'rental-102-requested'), false)
+  assert.ok(student.some((item) => item.id === 'message-1-1'))
+  assert.equal(student.find((item) => item.id === 'rental-101-completed').isRead, false)
+  assert.equal(student.find((item) => item.id === 'rental-102-confirmed').isRead, false)
+
+  await assert.rejects(markNotificationRead('message-does-not-exist'), { status: 404 })
+  await assert.rejects(markNotificationRead('rental-102-requested'), { status: 404 })
+  setSessionToken('b'.repeat(64))
+  await assert.rejects(getNotifications(), { status: 401 })
+})
+
+test('notification API failures are surfaced instead of falling back to mock data', async (t) => {
+  setSessionToken(null)
+  t.mock.method(globalThis, 'fetch', async () =>
+    Response.json({ error: 'Notifications unavailable.' }, { status: 503 }))
+  await assert.rejects(getNotifications(), {
+    name: 'ApiError', status: 503, message: 'Notifications unavailable.',
+  })
+})
+
+test('confirming a return updates server notifications', async (t) => {
+  const data = mockData()
+  const rental = data.rentals[0]
+  rental.status = 'active'
+  rental.endDate = '2000-01-01'
+
+  const app = createApp({ store: { load: async () => data } })
+  const server = await startTestServer(app)
+  const nativeFetch = globalThis.fetch
+
+  t.after(async () => {
+    globalThis.fetch = nativeFetch
+    setSessionToken(null)
+    await server.close()
   })
 
-  t.mock.method(
-    globalThis,
-    'fetch',
-    async () => Response.json(mockResponse())
+  globalThis.fetch = (url, options) =>
+    nativeFetch(new URL(url, server.baseUrl), options)
+  setSessionToken(null)
+
+  const overdueId = 'rental-101-overdue-2000-01-01'
+
+  const before = await getNotifications()
+  assert.equal(
+    before.find((item) => item.id === overdueId)?.title,
+    'Return overdue'
   )
 
-  await loadMockData()
+  // Use the actual frontend service, not a direct fixture mutation.
+  const completed = await confirmReturnRequest(101, {
+    condition: 'As described',
+  })
 
-  const notifications = getNotifications('owner-1')
+  assert.equal(completed.status, 'completed')
+  assert.equal(rental.status, 'completed')
 
-  assert.ok(notifications.length > 0)
-  assert.ok(notifications.every((item) => !item.isRead))
-
-  // Incoming rental requests link to the booking summary.
-  const rentalRequest = notifications.find(
-    (item) => item.id === 'rental-101-requested'
-  )
-
-  assert.ok(rentalRequest)
-  assert.equal(rentalRequest.to, '/bookings/101')
-
-  // Extension requests link directly to their details.
-  const extension = notifications.find(
-    (item) => item.id === 'rental-105-extension_requested'
-  )
-
-  assert.ok(extension)
-  assert.equal(extension.to, '/bookings/105/extension')
-
-  // Completed rentals link to reviews when eligible.
-  const completed = notifications.find(
-    (item) => item.id === 'rental-106-completed'
-  )
-
-  assert.ok(completed)
-  assert.equal(completed.to, '/bookings/106/review')
-
-  // Messages link to the actual conversation.
-  const message = notifications.find(
-    (item) => item.category === 'Message'
-  )
-
-  assert.ok(message)
-  assert.equal(message.to, '/inbox?conversation=1')
-
-  // Users should not receive notifications for unrelated rentals.
-  assert.deepEqual(getNotifications('unknown-user'), [])
-
-  // Individual read action.
-  const initialUnread = getUnreadCount('owner-1')
+  const after = await getNotifications()
 
   assert.equal(
-    markNotificationRead(rentalRequest.id, 'owner-1'),
-    true
+    after.find((item) => item.id === 'rental-101-completed')?.title,
+    'Rental completed'
   )
+  assert.equal(after.some((item) => item.id === overdueId), false)
+})
 
+test('chat producers create server-backed notifications', async (t) => {
+  const data = mockData()
+  const app = createApp({ store: { load: async () => data } })
+  const server = await startTestServer(app)
+  const nativeFetch = globalThis.fetch
+  const studentToken = 'c'.repeat(64)
+
+  app.locals.auth.sessions.set(studentToken, 'student-2')
+
+  t.after(async () => {
+    globalThis.fetch = nativeFetch
+    setSessionToken(null)
+    await server.close()
+  })
+
+  globalThis.fetch = (url, options) =>
+    nativeFetch(new URL(url, server.baseUrl), options)
+
+  setSessionToken(null)
+
+  // Owner sends a message through the actual chat API service.
+  const conversation = await sendChatMessage(1, 'Is the lamp available?')
+  const message = conversation.messages.at(-1)
+
+  assert.equal(message.senderId, 'owner-1')
+  assert.equal(data.conversations[0].messages.at(-1).id, message.id)
+
+  // Recipient receives the newly created unread notification.
+  setSessionToken(studentToken)
+
+  const messageId = `message-1-${message.id}`
+  const received = (await getNotifications())
+    .find((item) => item.id === messageId)
+
+  assert.equal(received?.title, 'New message')
+  assert.equal(received?.isRead, false)
+  assert.equal(received?.to, '/inbox?conversation=1')
+  assert.equal(received?.createdAt, message.sentAt)
+
+  // The sender must not receive their own message notification.
+  setSessionToken(null)
   assert.equal(
-    getUnreadCount('owner-1'),
-    initialUnread - 1
-  )
-
-  assert.equal(
-    getNotifications('owner-1').find(
-      (item) => item.id === rentalRequest.id
-    ).isRead,
-    true
-  )
-
-  // Read state is saved in browser storage.
-  const savedReadIds = JSON.parse(
-    storage.get('dormshare-notifications-read:owner-1')
-  )
-
-  assert.ok(savedReadIds.includes(rentalRequest.id))
-
-  // Read state is isolated between users.
-  assert.ok(
-    getNotifications('student-2').every(
-      (item) => !item.isRead
-    )
-  )
-
-  // Unknown notification IDs are rejected.
-  assert.equal(
-    markNotificationRead('does-not-exist', 'owner-1'),
+    (await getNotifications()).some((item) => item.id === messageId),
     false
   )
 
-  assert.equal(
-    markNotificationUnread('does-not-exist', 'owner-1'),
-    false
-  )
+  // Borrower sends a real offer through the chat API.
+  setSessionToken(studentToken)
 
-  // Mark an individual notification unread again.
+  const withOffer = await sendChatOffer(1, {
+    totalPrice: 15,
+    startDate: '2099-01-10',
+    endDate: '2099-01-12',
+  })
+
+  const offer = withOffer.messages.at(-1)
+  assert.equal(offer.type, 'offer')
+  assert.equal(offer.senderId, 'student-2')
+
+  // Owner receives an unread offer notification.
+  setSessionToken(null)
+
+  const offerNotice = (await getNotifications())
+    .find((item) => item.id === `message-1-${offer.id}`)
+
+  assert.equal(offerNotice?.title, 'Offer received')
+  assert.equal(offerNotice?.isRead, false)
+
+  // Accepting the offer must create a booking on the server.
+  const booking = await acceptChatOffer(1, offer.id)
+
+  assert.equal(booking.status, 'confirmed')
   assert.equal(
-    markNotificationUnread(rentalRequest.id, 'owner-1'),
+    data.rentals.some((rental) => rental.id === booking.id),
     true
   )
 
-  assert.equal(
-    getUnreadCount('owner-1'),
-    initialUnread
-  )
+  // The new booking is immediately visible to notifications.
+  const bookingId = `rental-${booking.id}-confirmed`
 
-  // Bulk read action.
-  markAllNotificationsRead('owner-1')
+  const ownerNotice = (await getNotifications())
+    .find((item) => item.id === bookingId)
 
-  assert.equal(getUnreadCount('owner-1'), 0)
+  assert.equal(ownerNotice?.title, 'Booking confirmed')
+  assert.equal(ownerNotice?.isRead, false)
+  assert.equal(ownerNotice?.to, `/bookings/${booking.id}`)
 
-  assert.ok(
-    getNotifications('owner-1').every(
-      (item) => item.isRead
-    )
-  )
+  // The borrower receives the confirmed booking too.
+  setSessionToken(studentToken)
 
-  // A booking status change creates a new notification.
-  updateRentalStatus(101, 'confirmed')
+  const borrowerNotice = (await getNotifications())
+    .find((item) => item.id === bookingId)
 
-  const updated = getNotifications('owner-1')
-
-  assert.ok(
-    updated.some(
-      (item) =>
-        item.id === 'rental-101-confirmed' &&
-        !item.isRead
-    )
-  )
-
-  assert.ok(
-    !updated.some(
-      (item) => item.id === 'rental-101-requested'
-    )
-  )
-
-  // REGRESSION 1: Overdue alerts must have distinct read states.
-  // Set a future return date to create a normal reminder.
-  updateRental(104, {
-    endDate: '2099-12-31',
-  })
-
-  const reminder = getNotifications('owner-1').find(
-    (item) => item.id === 'rental-104-active'
-  )
-
-  assert.ok(reminder)
-  assert.equal(reminder.title, 'Return reminder')
-
-  // Mark the normal reminder as read.
-  assert.equal(
-    markNotificationRead(reminder.id, 'owner-1'),
-    true
-  )
-
-  // Move the return date into the past.
-  updateRental(104, {
-    endDate: '2000-01-01',
-  })
-
-  const overdue = getNotifications('owner-1').find(
-    (item) => item.id === 'rental-104-overdue'
-  )
-
-  assert.ok(overdue)
-  assert.equal(overdue.title, 'Return overdue')
-  assert.equal(overdue.isRead, false)
-  assert.equal(overdue.to, '/bookings/104')
-
-  // The old reminder ID must not be reused.
-  assert.notEqual(reminder.id, overdue.id)
-
-  // REGRESSION 2: Approved extensions notify the borrower.
-  updateRental(105, {
-    status: 'active',
-    endDate: '2099-11-15',
-    extensionRequest: {
-      status: 'approved',
-      newEndDate: '2099-11-15',
-    },
-  })
-
-  const approved = getNotifications('student-2').find(
-    (item) =>
-      item.id === 'rental-105-extension-approved-2099-11-15'
-  )
-
-  assert.ok(approved)
-  assert.equal(approved.title, 'Extension approved')
-  assert.equal(approved.to, '/bookings/105/extension')
-  assert.equal(approved.isRead, false)
-
-  // The owner should not receive the borrower's decision alert.
-  assert.ok(
-    !getNotifications('owner-1').some(
-      (item) => item.id === approved.id
-    )
-  )
-
-  // Reading the approval should work normally.
-  assert.equal(
-    markNotificationRead(approved.id, 'student-2'),
-    true
-  )
-
-  assert.equal(
-    getNotifications('student-2').find(
-      (item) => item.id === approved.id
-    ).isRead,
-    true
-  )
-
-  // REGRESSION 3: Declined extensions also notify the borrower.
-  updateRental(105, {
-    status: 'active',
-    extensionRequest: {
-      status: 'declined',
-      newEndDate: '2099-11-16',
-    },
-  })
-
-  const declined = getNotifications('student-2').find(
-    (item) =>
-      item.id === 'rental-105-extension-declined-2099-11-16'
-  )
-
-  assert.ok(declined)
-  assert.equal(declined.title, 'Extension declined')
-  assert.equal(declined.to, '/bookings/105/extension')
-  assert.equal(declined.isRead, false)
-
-  // Different extension outcomes must have different IDs.
-  assert.notEqual(approved.id, declined.id)
-
-  // The previous approval's read state must not hide a new decline.
-  assert.equal(declined.isRead, false)
-
-  // Owners do not receive the borrower's decision notification.
-  assert.ok(
-    !getNotifications('owner-1').some(
-      (item) => item.id === declined.id
-    )
-  )
+  assert.equal(borrowerNotice?.title, 'Booking confirmed')
+  assert.equal(borrowerNotice?.isRead, false)
 })

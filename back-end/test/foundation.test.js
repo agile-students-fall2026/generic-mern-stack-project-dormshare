@@ -40,6 +40,23 @@ describe("Backend foundation", () => {
     expect((await updated.json()).rentals[0].status).to.equal("active");
   });
 
+  it("hides other students' item request responses from the shared payload", async () => {
+    const data = await app.locals.mockDataStore.load();
+    const reply = (responderId, conversationId) => ({ responderId, conversationId, messageIds: [conversationId] });
+    const [others] = data.itemRequests;
+    const mine = { ...others, id: 2, requesterId: "owner-1" };
+    data.itemRequests.push(mine);
+    others.responses = [reply("student-3", 7), reply("owner-1", 8)];
+    mine.responses = [reply("student-2", 9), reply("student-3", 10)];
+    const stored = JSON.stringify(data.itemRequests);
+
+    const body = await (await fetch(`${server.baseUrl}/api/mock-data`)).json();
+
+    expect(body.itemRequests[0].responses).to.deep.equal([reply("owner-1", 8)]);
+    expect(body.itemRequests[1].responses).to.deep.equal(mine.responses);
+    expect(JSON.stringify(data.itemRequests)).to.equal(stored, "the stored requests are not changed");
+  });
+
   for (const [status, message] of [
     [502, "Could not load mock data."],
     [503, "Mock data is not configured."],

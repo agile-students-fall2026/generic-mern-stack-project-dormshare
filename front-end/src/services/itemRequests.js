@@ -1,10 +1,10 @@
-// Item request service (#57). Pages call these functions instead of touching the
-// shared store directly, so they can later be swapped for backend requests.
-// Requests come from the shared Mockaroo data in mockDataService.js.
+// Item request service (#57). Creating, loading, closing, and responding go through
+// the back-end (#105, #109); each response is copied into the shared cache in
+// mockDataService.js so the board cards and other readers see the change.
 import { api } from './api.js'
 import {
   cacheConversation,
-  createItemRequest,
+  cacheItemRequest,
   getItemRequests as getAllItemRequests,
   getListingsForOwner,
   updateItemRequest,
@@ -39,23 +39,42 @@ export function validateItemRequest({ itemName, neededBy, neededUntil, approxima
   return errors
 }
 
-// Returns { request } when saved, or { errors } when the form is invalid.
-export function postItemRequest(form) {
+const requestPath = (id) => `/item-requests/${encodeURIComponent(id)}`
+
+// Resolves to { request } when saved, or { errors } when the form is invalid. The form
+// is checked here first, then by the server, whose per-field messages (such as text
+// length limits) come back the same way. Other failures reject with an ApiError.
+export async function postItemRequest(form) {
   const errors = validateItemRequest(form)
   if (Object.keys(errors).length > 0) return { errors }
 
-  const request = createItemRequest({
-    itemName: form.itemName.trim(),
-    neededBy: form.neededBy,
-    neededUntil: form.neededUntil,
-    approximateArea: form.approximateArea.trim(),
-    targetPrice: form.targetPrice === '' ? null : Number(form.targetPrice),
-    details: form.details.trim(),
-  })
-  return { request }
+  try {
+    const request = await api('/item-requests', {
+      method: 'POST',
+      body: {
+        itemName: form.itemName.trim(),
+        neededBy: form.neededBy,
+        neededUntil: form.neededUntil,
+        approximateArea: form.approximateArea.trim(),
+        targetPrice: form.targetPrice === '' ? null : Number(form.targetPrice),
+        details: form.details.trim(),
+      },
+    })
+    return { request: cacheItemRequest(request) }
+  } catch (error) {
+    if (error.errors) return { errors: error.errors }
+    throw error
+  }
 }
 
-export const closeItemRequest = (id) => updateItemRequest(id, { status: 'closed' })
+// Loads one request from the server, including ones posted after the app loaded.
+export async function fetchItemRequest(id) {
+  return cacheItemRequest(await api(requestPath(id)))
+}
+
+export async function closeItemRequest(id) {
+  return cacheItemRequest(await api(`${requestPath(id)}/close`, { method: 'PATCH' }))
+}
 
 // A response opens (or continues) a chat with the requester about one of the
 // responder's published listings. Pass totalPrice to include an offer for the
@@ -122,13 +141,16 @@ export async function sendItemRequestResponse(requestId, { listingId, message = 
 
 // The newest response to a request: who sent it, and their latest offer for it
 // (or null for a message-only reply). Counteroffers from the requester are not
-// counted. Returns null when there are no responses.
+// counted. Returns null when there are no responses. If the reply's chat isn't in
+// the cache yet (someone replied after the app loaded), the reply is still returned
+// with chatLoaded false, so it isn't mistaken for "no replies".
 export function getLatestResponse(request) {
   const response = request.responses.at(-1)
-  const conversation = response && getConversation(response.conversationId)
-  if (!conversation) return null
+  if (!response) return null
+  const conversation = getConversation(response.conversationId)
+  if (!conversation) return { ...response, listingId: null, offer: null, chatLoaded: false }
 
   const offer = conversation.messages.findLast((m) =>
     m.type === 'offer' && m.senderId === response.responderId && response.messageIds.includes(m.id))
-  return { ...response, listingId: conversation.listingId, offer: offer ?? null }
+  return { ...response, listingId: conversation.listingId, offer: offer ?? null, chatLoaded: true }
 }

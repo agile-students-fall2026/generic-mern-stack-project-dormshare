@@ -207,6 +207,17 @@ export function getItemRequests() {
   return structuredClone(itemRequests)
 }
 
+// Keep legacy readers (board cards, chat summaries) current after a successful
+// item request API response.
+export function cacheItemRequest(request) {
+  const cached = structuredClone(request)
+  const exists = itemRequests.some((item) => sameId(item.id, cached.id))
+  itemRequests = exists
+    ? itemRequests.map((item) => sameId(item.id, cached.id) ? cached : item)
+    : [cached, ...itemRequests]
+  return structuredClone(cached)
+}
+
 export function createItemRequest(details) {
   const id = Math.max(0, ...itemRequests.map((item) => item.id)) + 1
   const request = {

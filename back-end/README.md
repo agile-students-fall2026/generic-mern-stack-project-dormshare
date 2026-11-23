@@ -392,12 +392,19 @@ GET `/api/requests-board` takes an optional `type` query: `all` (the default),
 `quick`, `item`, or `mine`. Each request in the response has `type` set to
 `quick` or `item`. `mine` returns only the current user's requests, and every
 other type returns only other people's. `quick` and `item` limit the list to one
-kind, and item requests are included only while `open`. Any other `type` returns
+kind, and item requests are included only while `open`. Only the requester sees
+every entry in an item request's `responses`; other students see just their own. Any other `type` returns
 400. The board only reads item requests. Creating and answering them is not part
 of these routes.
 
-Frontend integration is not done yet. The pages still use `localStorage` and the
-mock data.
+`GET /api/mock-data` hides other students' item request responses too, like the
+board. It is the demo bootstrap, so it still returns the rest of the shared data
+(other people's conversations and bookings) in full until the frontend stops
+loading it.
+
+The Quick Borrow form posts to `POST /api/quick-borrow` and the requests board
+loads `GET /api/requests-board`. The item request pages use `/api/item-requests`
+(#109), so the board shows every request from the server.
 
 
 ## Handoff routes (#113)
