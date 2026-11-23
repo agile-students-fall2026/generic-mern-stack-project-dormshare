@@ -43,6 +43,8 @@ function SetupProfile() {
     return <Navigate to="/login" replace />
   }
 
+  if (currentUser.isDemo) return <Navigate to="/profile" replace />
+
   if (!currentUser.emailVerified) {
     return <Navigate to="/login" replace />
   }
