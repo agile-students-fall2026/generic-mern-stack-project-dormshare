@@ -14,8 +14,6 @@ let conversations = []
 let reviews = []
 let itemRequests = []
 let quickBorrowRequests = []
-// IDs of item requests posted in this browser. The back-end has no route for them yet.
-const localItemRequestIds = new Set()
 let loading
 
 const sameId = (first, second) => String(first) === String(second)
@@ -209,11 +207,6 @@ export function getItemRequests() {
   return structuredClone(itemRequests)
 }
 
-// Item requests posted in this browser, which the back-end does not know about yet.
-export function getLocalItemRequests() {
-  return structuredClone(itemRequests.filter((item) => localItemRequestIds.has(item.id)))
-}
-
 // Keep legacy readers (board cards, chat summaries) current after a successful
 // item request API response.
 export function cacheItemRequest(request) {
@@ -237,7 +230,6 @@ export function createItemRequest(details) {
   }
 
   itemRequests = [request, ...itemRequests]
-  localItemRequestIds.add(id)
   return structuredClone(request)
 }
 
