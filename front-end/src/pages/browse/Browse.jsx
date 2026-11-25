@@ -22,12 +22,12 @@ function Browse() {
     <main className="ds-page ds-discovery">
       <header className="ds-discovery-header">
         <div>
-          <h1 className="ds-heading">Browse items</h1>
-          <p className="ds-page-intro">Borrow, lend and rent within NYU.</p>
+          <h1 className="ds-heading">Listings</h1>
+          <p className="ds-page-intro">Items NYU students are lending. Find something to borrow.</p>
         </div>
         <Link className="ds-text-link" to="/renter-dashboard">
           <Icon name="rentals" />
-          My Rentals and saved items
+          Your activity and saved items
         </Link>
       </header>
 

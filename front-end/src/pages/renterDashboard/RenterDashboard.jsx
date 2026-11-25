@@ -80,7 +80,7 @@ function RentalActivity() {
           <p>{rentals.length === 0
             ? 'Browse items to find something you need.'
             : 'Choose another rental status or clear the filter.'}</p>
-          {rentals.length === 0 && <Link className="ds-text-link" to="/browse">Browse items</Link>}
+          {rentals.length === 0 && <Link className="ds-text-link" to="/browse">Browse listings</Link>}
         </div>
       ) : (
         <div className="ds-management-list">
@@ -109,10 +109,10 @@ function RenterDashboard() {
       <ActivityTabs />
       <header className="ds-management-header">
         <div className="ds-page-intro">
-          <h1 className="ds-heading">My Rentals</h1>
-          <p>Track your rental requests and borrowed items.</p>
+          <h1 className="ds-heading">Borrowing</h1>
+          <p>Track what you have asked to borrow, and your saved items.</p>
         </div>
-        <Link className="ds-button ds-button--primary" to="/browse">Browse items</Link>
+        <Link className="ds-button ds-button--primary" to="/browse">Browse listings</Link>
       </header>
 
       <section className="ds-management-section" aria-labelledby="renter-rental-activity-heading">
@@ -128,7 +128,7 @@ function RenterDashboard() {
           <div className="ds-management-empty">
             <h3>No saved items yet</h3>
             <p>Save items while you browse to find them here later.</p>
-            <Link className="ds-text-link" to="/browse">Browse items</Link>
+            <Link className="ds-text-link" to="/browse">Browse listings</Link>
           </div>
         )}
 

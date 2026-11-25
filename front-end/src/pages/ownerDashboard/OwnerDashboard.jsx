@@ -43,8 +43,8 @@ function OwnerDashboard() {
       <ActivityTabs />
       <header className="ds-management-header">
         <div className="ds-page-intro">
-          <h1 className="ds-heading">Owner Dashboard</h1>
-          <p>Review rental activity and recorded income.</p>
+          <h1 className="ds-heading">Lending</h1>
+          <p>Track who is borrowing your items and your recorded income.</p>
         </div>
         <Link className="ds-button ds-button--primary" to="/listings">Manage listings</Link>
       </header>
