@@ -121,7 +121,7 @@ function RenterDashboard() {
       </section>
 
       <section className="ds-management-section" aria-labelledby="saved-items-heading">
-        <h2 id="saved-items-heading">Saved items</h2>
+        <h2 id="saved-items-heading">Saved listings</h2>
         <SavedItemsStatus />
 
         {savedListings?.length === 0 && (

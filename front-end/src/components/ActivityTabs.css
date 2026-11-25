@@ -1,21 +1,20 @@
 .ds-activity-tabs {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
+  display: flex;
+  gap: var(--ds-space-4);
   margin-bottom: 24px;
-  border-radius: 999px;
-  background: var(--ds-surface);
+  border-bottom: 1px solid var(--ds-line);
 }
 
 .ds-activity-tabs a {
-  padding: 8px 18px;
-  border-radius: 999px;
-  color: inherit;
-  font-weight: 600;
+  margin-bottom: -1px;
+  padding: 10px 2px;
+  border-bottom: 2px solid transparent;
+  color: var(--ds-muted);
+  font-weight: 700;
   text-decoration: none;
 }
 
 .ds-activity-tabs a.active {
-  background: var(--ds-accent);
-  color: #fff;
+  border-bottom-color: var(--ds-violet);
+  color: var(--ds-violet);
 }

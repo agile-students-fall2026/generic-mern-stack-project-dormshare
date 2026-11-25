@@ -1,15 +1,16 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import RequestCard from './RequestCard'
 import { REQUEST_TYPES, fetchBoardRequests } from '../../services/requestsBoard'
 import './requestsBoard.css'
 import '../../styles/messages.css'
 
-const TABS = [['all', 'All'], ...Object.entries(REQUEST_TYPES), ['mine', 'My requests']]
+const TABS = [['all', 'All'], ...Object.entries(REQUEST_TYPES), ['mine', 'My requests'], ['answered', 'Answered requests']]
 
 // Shared board of item requests and quick borrow requests.
 function RequestsBoard() {
-  const [type, setType] = useState('all')
+  const [searchParams] = useSearchParams()
+  const [type, setType] = useState(TABS.some(([value]) => value === searchParams.get('tab')) ? searchParams.get('tab') : 'all')
   const [attempt, setAttempt] = useState(0)
   // The last answer from the API, tagged with the tab and attempt it was for.
   const [result, setResult] = useState(null)
@@ -17,8 +18,8 @@ function RequestsBoard() {
 
   useEffect(() => {
     let current = true
-    fetchBoardRequests(type).then(
-      (requests) => { if (current) setResult({ key, requests }) },
+    fetchBoardRequests(type === 'answered' ? 'mine' : type).then(
+      (requests) => { if (current) setResult({ key, requests: type === 'answered' ? requests.filter((request) => request.responses?.length) : requests }) },
       (error) => { if (current) setResult({ key, error }) },
     )
     return () => { current = false }
@@ -65,7 +66,7 @@ function RequestsBoard() {
           </button>
         </>
       ) : requests.length === 0 ? (
-        <p className="ds-feedback">{type === 'mine' ? "You haven't posted any requests yet." : 'No requests yet.'}</p>
+        <p className="ds-feedback">{type === 'answered' ? 'None of your requests have been answered yet.' : type === 'mine' ? "You haven't posted any requests yet." : 'No requests yet.'}</p>
       ) : (
         <div className="request-board-grid">
           {requests.map((request) => (
