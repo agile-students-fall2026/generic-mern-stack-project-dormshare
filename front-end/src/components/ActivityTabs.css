@@ -1,0 +1,21 @@
+.ds-activity-tabs {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 24px;
+  border-radius: 999px;
+  background: var(--ds-surface);
+}
+
+.ds-activity-tabs a {
+  padding: 8px 18px;
+  border-radius: 999px;
+  color: inherit;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.ds-activity-tabs a.active {
+  background: var(--ds-accent);
+  color: #fff;
+}

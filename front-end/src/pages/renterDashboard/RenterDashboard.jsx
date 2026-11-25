@@ -1,5 +1,6 @@
 import { useContext, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ActivityTabs from '../../components/ActivityTabs.jsx'
 import SaveListingButton, { SavedItemsStatus } from '../../components/SaveListingButton.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { SavedItemsContext } from '../../context/SavedItemsContext.js'
@@ -105,6 +106,7 @@ function RenterDashboard() {
 
   return (
     <main className="ds-page ds-management">
+      <ActivityTabs />
       <header className="ds-management-header">
         <div className="ds-page-intro">
           <h1 className="ds-heading">My Rentals</h1>

@@ -61,7 +61,7 @@ function Profile() {
             to="/renter-dashboard"
             className="ds-button ds-button--secondary"
           >
-            Renter dashboard
+            Borrowing activity
           </Link>
         </div>
       </section>
@@ -85,7 +85,7 @@ function Profile() {
             to="/owner-dashboard"
             className="ds-button ds-button--secondary"
           >
-            Owner dashboard
+            Lending activity
           </Link>
         </div>
       </section>

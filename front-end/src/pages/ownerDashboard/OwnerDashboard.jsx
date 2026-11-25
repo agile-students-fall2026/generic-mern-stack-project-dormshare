@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import ActivityTabs from '../../components/ActivityTabs.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { rentalStatuses } from '../../data/options.js'
 import { getOwnerDashboard } from '../../services/ownerDashboard.js'
@@ -39,6 +40,7 @@ function OwnerDashboard() {
 
   return (
     <main className="ds-page ds-management">
+      <ActivityTabs />
       <header className="ds-management-header">
         <div className="ds-page-intro">
           <h1 className="ds-heading">Owner Dashboard</h1>
