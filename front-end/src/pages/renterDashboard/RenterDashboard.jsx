@@ -1,5 +1,5 @@
-import { useContext, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useContext, useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
 import ActivityTabs from '../../components/ActivityTabs.jsx'
 import SaveListingButton, { SavedItemsStatus } from '../../components/SaveListingButton.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
@@ -14,7 +14,7 @@ function formatStatus(status) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-function RentalActivity() {
+function RentalActivity({ onSettled }) {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [result, setResult] = useState(null)
   const [attempt, setAttempt] = useState(0)
@@ -22,11 +22,11 @@ function RentalActivity() {
   useEffect(() => {
     let current = true
     getMyRentals().then(
-      (rentals) => { if (current) setResult({ rentals }) },
-      (error) => { if (current) setResult({ error }) },
+      (rentals) => { if (current) { setResult({ rentals }); onSettled() } },
+      (error) => { if (current) { setResult({ error }); onSettled() } },
     )
     return () => { current = false }
-  }, [attempt])
+  }, [attempt, onSettled])
 
   if (!result) return <p className="ds-status" role="status">Loading rentals...</p>
 
@@ -103,6 +103,17 @@ function RentalActivity() {
 
 function RenterDashboard() {
   const { savedListings } = useContext(SavedItemsContext)
+  const { hash } = useLocation()
+  const [rentalsSettled, setRentalsSettled] = useState(false)
+  const settleRentals = useCallback(() => setRentalsSettled(true), [])
+
+  // Reach a #fragment (e.g. the profile's Saved listings shortcut) once the rentals have
+  // loaded, because they push the saved section down the page.
+  useEffect(() => {
+    const target = rentalsSettled && hash ? document.getElementById(hash.slice(1)) : null
+    target?.scrollIntoView()
+    target?.focus({ preventScroll: true })
+  }, [hash, rentalsSettled])
 
   return (
     <main className="ds-page ds-management">
@@ -117,11 +128,11 @@ function RenterDashboard() {
 
       <section className="ds-management-section" aria-labelledby="renter-rental-activity-heading">
         <h2 id="renter-rental-activity-heading">Rental activity</h2>
-        <RentalActivity />
+        <RentalActivity onSettled={settleRentals} />
       </section>
 
       <section className="ds-management-section" aria-labelledby="saved-items-heading">
-        <h2 id="saved-items-heading">Saved listings</h2>
+        <h2 id="saved-items-heading" tabIndex={-1}>Saved listings</h2>
         <SavedItemsStatus />
 
         {savedListings?.length === 0 && (

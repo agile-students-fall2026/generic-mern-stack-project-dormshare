@@ -4,7 +4,7 @@ import { createApp } from '../../back-end/app.js'
 import { startTestServer } from '../../back-end/test/helpers/server.js'
 import { ApiError } from '../src/services/api.js'
 import { createQuickBorrowRequest } from '../src/services/quickBorrow.js'
-import { fetchBoardRequests } from '../src/services/requestsBoard.js'
+import { answeredRequests, boardTab, fetchBoardRequests } from '../src/services/requestsBoard.js'
 import { mockResponse } from './fixtures.js'
 
 // Runs the front-end services against the real Express routes. The current user is owner-1.
@@ -85,5 +85,17 @@ describe('Quick Borrow and requests board API integration (#114)', () => {
         (error) => error instanceof ApiError && error.status === 400 && /type must be one of/.test(error.message),
       )
     })
+  })
+})
+
+describe('Requests board tab from the URL', () => {
+  it('uses a known ?tab= value and falls back to all', () => {
+    for (const tab of ['all', 'quick', 'item', 'mine', 'answered']) assert.equal(boardTab(tab), tab)
+    for (const tab of [null, '', 'unknown']) assert.equal(boardTab(tab), 'all')
+  })
+
+  it('keeps only requests that have a response as answered', () => {
+    const requests = [{ id: 1, responses: [] }, { id: 2, responses: [{ conversationId: 'c' }] }, { id: 3 }]
+    assert.deepEqual(answeredRequests(requests).map((request) => request.id), [2])
   })
 })

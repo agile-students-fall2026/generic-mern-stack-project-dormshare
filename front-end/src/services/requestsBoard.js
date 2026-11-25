@@ -13,3 +13,11 @@ export const REQUEST_TYPES = {
 // requests; every other tab shows only other people's. Newest first.
 export const fetchBoardRequests = (type = 'all') =>
   api(`/requests-board?type=${encodeURIComponent(type)}`)
+
+// The tabs the board can show. 'answered' is your own requests that have a response.
+export const BOARD_TABS = ['all', ...Object.keys(REQUEST_TYPES), 'mine', 'answered']
+
+// The active tab for a ?tab= value; anything unknown falls back to 'all'.
+export const boardTab = (value) => (BOARD_TABS.includes(value) ? value : 'all')
+
+export const answeredRequests = (requests) => requests.filter((request) => request.responses?.length)
