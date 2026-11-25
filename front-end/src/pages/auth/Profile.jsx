@@ -45,50 +45,31 @@ function Profile() {
 
       <section
         className="profile-section"
-        aria-labelledby="profile-renter-heading"
+        aria-labelledby="profile-mine-heading"
       >
-        <h2 id="profile-renter-heading">As a renter</h2>
-        <p className="ds-account-help">
-          Borrow items from other students.
-        </p>
+        <h2 id="profile-mine-heading">My listings and requests</h2>
         <div className="ds-account-actions">
-          <Link
-            to="/requests-board"
-            className="ds-button ds-button--secondary"
-          >
-            Requests board
-          </Link>
-          <Link
-            to="/renter-dashboard"
-            className="ds-button ds-button--secondary"
-          >
-            Renter dashboard
-          </Link>
-        </div>
-      </section>
-
-      <section
-        className="profile-section"
-        aria-labelledby="profile-owner-heading"
-      >
-        <h2 id="profile-owner-heading">As an owner</h2>
-        <p className="ds-account-help">
-          Lend your items to other students.
-        </p>
-        <div className="ds-account-actions">
-          <Link
-            to="/listings"
-            className="ds-button ds-button--secondary"
-          >
+          <Link to="/listings" className="ds-button ds-button--secondary">
             My listings
           </Link>
-          <Link
-            to="/owner-dashboard"
-            className="ds-button ds-button--secondary"
-          >
-            Owner dashboard
+          <Link to="/renter-dashboard#saved-items-heading" className="ds-button ds-button--secondary">
+            Saved listings
+          </Link>
+          <Link to="/requests-board?tab=mine" className="ds-button ds-button--secondary">
+            My requests
+          </Link>
+          <Link to="/requests-board?tab=answered" className="ds-button ds-button--secondary">
+            Answered requests
           </Link>
         </div>
+        <nav className="profile-links" aria-label="Activity">
+          <Link to="/renter-dashboard" className="ds-text-link">
+            Borrowing activity
+          </Link>
+          <Link to="/owner-dashboard" className="ds-text-link">
+            Lending activity
+          </Link>
+        </nav>
       </section>
 
       <section

@@ -1,5 +1,6 @@
-import { useContext, useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useCallback, useContext, useEffect, useState } from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import ActivityTabs from '../../components/ActivityTabs.jsx'
 import SaveListingButton, { SavedItemsStatus } from '../../components/SaveListingButton.jsx'
 import StatusBadge from '../../components/StatusBadge.jsx'
 import { SavedItemsContext } from '../../context/SavedItemsContext.js'
@@ -13,7 +14,7 @@ function formatStatus(status) {
   return label.charAt(0).toUpperCase() + label.slice(1)
 }
 
-function RentalActivity() {
+function RentalActivity({ onSettled }) {
   const [selectedStatus, setSelectedStatus] = useState('all')
   const [result, setResult] = useState(null)
   const [attempt, setAttempt] = useState(0)
@@ -21,11 +22,11 @@ function RentalActivity() {
   useEffect(() => {
     let current = true
     getMyRentals().then(
-      (rentals) => { if (current) setResult({ rentals }) },
-      (error) => { if (current) setResult({ error }) },
+      (rentals) => { if (current) { setResult({ rentals }); onSettled() } },
+      (error) => { if (current) { setResult({ error }); onSettled() } },
     )
     return () => { current = false }
-  }, [attempt])
+  }, [attempt, onSettled])
 
   if (!result) return <p className="ds-status" role="status">Loading rentals...</p>
 
@@ -79,7 +80,7 @@ function RentalActivity() {
           <p>{rentals.length === 0
             ? 'Browse items to find something you need.'
             : 'Choose another rental status or clear the filter.'}</p>
-          {rentals.length === 0 && <Link className="ds-text-link" to="/browse">Browse items</Link>}
+          {rentals.length === 0 && <Link className="ds-text-link" to="/browse">Browse listings</Link>}
         </div>
       ) : (
         <div className="ds-management-list">
@@ -102,31 +103,43 @@ function RentalActivity() {
 
 function RenterDashboard() {
   const { savedListings } = useContext(SavedItemsContext)
+  const { hash } = useLocation()
+  const [rentalsSettled, setRentalsSettled] = useState(false)
+  const settleRentals = useCallback(() => setRentalsSettled(true), [])
+
+  // Reach a #fragment (e.g. the profile's Saved listings shortcut) once the rentals have
+  // loaded, because they push the saved section down the page.
+  useEffect(() => {
+    const target = rentalsSettled && hash ? document.getElementById(hash.slice(1)) : null
+    target?.scrollIntoView()
+    target?.focus({ preventScroll: true })
+  }, [hash, rentalsSettled])
 
   return (
     <main className="ds-page ds-management">
+      <ActivityTabs />
       <header className="ds-management-header">
         <div className="ds-page-intro">
-          <h1 className="ds-heading">My Rentals</h1>
-          <p>Track your rental requests and borrowed items.</p>
+          <h1 className="ds-heading">Borrowing</h1>
+          <p>Track what you have asked to borrow, and your saved items.</p>
         </div>
-        <Link className="ds-button ds-button--primary" to="/browse">Browse items</Link>
+        <Link className="ds-button ds-button--primary" to="/browse">Browse listings</Link>
       </header>
 
       <section className="ds-management-section" aria-labelledby="renter-rental-activity-heading">
         <h2 id="renter-rental-activity-heading">Rental activity</h2>
-        <RentalActivity />
+        <RentalActivity onSettled={settleRentals} />
       </section>
 
       <section className="ds-management-section" aria-labelledby="saved-items-heading">
-        <h2 id="saved-items-heading">Saved items</h2>
+        <h2 id="saved-items-heading" tabIndex={-1}>Saved listings</h2>
         <SavedItemsStatus />
 
         {savedListings?.length === 0 && (
           <div className="ds-management-empty">
             <h3>No saved items yet</h3>
             <p>Save items while you browse to find them here later.</p>
-            <Link className="ds-text-link" to="/browse">Browse items</Link>
+            <Link className="ds-text-link" to="/browse">Browse listings</Link>
           </div>
         )}
 

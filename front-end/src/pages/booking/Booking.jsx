@@ -81,7 +81,7 @@ function Booking() {
         onSubmit={handleSubmit}
       />
       <p className="booking-note" style={{ marginTop: 12 }}>
-        Track pending requests in <Link className="ds-text-link" to="/renter-dashboard">My Rentals</Link>.
+        Track pending requests in <Link className="ds-text-link" to="/renter-dashboard">Activity</Link>.
       </p>
     </main>
   )

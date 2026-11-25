@@ -6,7 +6,7 @@ import './Navbar.css'
 
 const browse = { label: 'Browse', to: '/browse', icon: 'browse' }
 const requests = { label: 'Requests', to: '/requests-board', icon: 'requests' }
-const rentals = { label: 'Rentals', to: '/renter-dashboard', icon: 'rentals' }
+const rentals = { label: 'Activity', to: '/renter-dashboard', icon: 'rentals' }
 const messages = { label: 'Messages', to: '/inbox', icon: 'messages' }
 const profile = { label: 'Profile', to: '/profile', icon: 'profile' }
 const notifications = { label: 'Notifications', to: '/notifications', icon: 'bell' }
